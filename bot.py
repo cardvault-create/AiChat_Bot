@@ -1,6 +1,6 @@
 import os
 import asyncio
-import requests
+import google.generativeai as genai
 import pytz
 from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions
@@ -9,12 +9,15 @@ from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 # ==========================================
 
 # ================== OWNER SETUP ==================
 OWNER_USER_ID = 7614459746
 # =================================================
+
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 IST = pytz.timezone('Asia/Kolkata')
 
@@ -78,48 +81,32 @@ def format_time(minutes):
     return ", ".join(parts) if parts else "0 seconds"
 
 def get_ai_reply(user_input, chat_id):
-    """ChatGPT API se reply"""
     if chat_id not in user_history:
         user_history[chat_id] = []
     
-    messages = [{
-        "role": "system",
-        "content": "You are GARAM GAND AI, a helpful, friendly and smart assistant. Reply in user's language (Hindi/English/Hinglish). Give accurate answers. Use emojis naturally. Be friendly like a best friend. For coding give working code with explanation. Keep it simple and clear. No markdown formatting."
-    }]
+    prompt = """You are GARAM GAND AI, a helpful, friendly and smart assistant.
+Reply in user's language (Hindi/English/Hinglish).
+Give accurate answers. Use emojis naturally.
+Be friendly like a best friend.
+For coding give working code.
+Keep it simple and clear.
+No markdown formatting.
+
+Previous chat:
+"""
+    for msg in user_history[chat_id][-4:]:
+        prompt += f"{msg['role']}: {msg['content']}\n"
     
-    history = user_history[chat_id]
-    for msg in history[-6:]:
-        role = "user" if msg["role"] == "user" else "assistant"
-        messages.append({"role": role, "content": msg["content"]})
-    
-    messages.append({"role": "user", "content": user_input})
+    prompt += f"user: {user_input}\nassistant:"
     
     try:
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "gpt-3.5-turbo",
-                "messages": messages,
-                "temperature": 0.8,
-                "max_tokens": 600
-            },
-            timeout=30
-        )
-        
-        result = response.json()
-        if "choices" in result:
-            return result["choices"][0]["message"]["content"]
-        else:
-            error_msg = result.get("error", {}).get("message", "Unknown")
-            if "insufficient" in error_msg.lower():
-                return "💰 OpenAI balance khatam! Thoda wait karo."
-            return f"😅 Error: {error_msg[:50]}"
-    except:
-        return "😅 Network issue, fir se bol!"
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        err = str(e)
+        if "quota" in err.lower():
+            return "😴 Daily limit reached! Kal try karo."
+        return "😅 Fir se bol bhai!"
 
 def is_user_allowed(user_id):
     return user_id in allowed_users
@@ -187,10 +174,10 @@ async def welcome_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for new_user in update.message.new_chat_members:
         if new_user.id == context.bot.id:
-            await context.bot.send_message(chat_id=chat_id, text="🤖 GARAM GAND AI JOINED!\n\n👑 Admin /activate karo\n📢 Phir sabko ChatGPT reply milega!\n\n💻 Coding | 📚 Knowledge | 😂 Fun")
+            await context.bot.send_message(chat_id=chat_id, text="🤖 GARAM GAND AI JOINED!\n\n👑 Admin /activate karo\n📢 Phir sabko reply milega!\n\n💻 Coding | 📚 Knowledge | 😂 Fun")
             continue
         
-        await context.bot.send_message(chat_id=chat_id, text=f"✨ Welcome {new_user.first_name}! 🎉\n💎 ChatGPT Replies | 🔇 Mute | ⚡ Fast")
+        await context.bot.send_message(chat_id=chat_id, text=f"✨ Welcome {new_user.first_name}! 🎉\n💎 AI Replies | 🔇 Mute | ⚡ Fast")
 
 # ================== MUTE ==================
 
@@ -258,12 +245,9 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await update.message.reply_text(
             f"🔇 MUTED! 🇮🇳\n\n"
-            f"👤 {target_name}\n"
-            f"👑 {admin_name}\n"
-            f"⏱️ {format_time(mute_minutes)}\n\n"
+            f"👤 {target_name}\n👑 {admin_name}\n⏱️ {format_time(mute_minutes)}\n\n"
             f"📅 {now_ist.strftime('%I:%M:%S %p, %d %b %Y')}\n"
-            f"🔓 {until_ist.strftime('%I:%M:%S %p, %d %b %Y')}\n\n"
-            f"⏰ Auto Unmute ON"
+            f"🔓 {until_ist.strftime('%I:%M:%S %p, %d %b %Y')}\n\n⏰ Auto Unmute ON"
         )
         
         async def auto_unmute():
@@ -327,15 +311,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_type == ChatType.PRIVATE:
         if is_user_allowed(user_id):
             user_history[chat_id] = []
-            await update.message.reply_text(
-                "💎 GARAM GAND AI — ChatGPT Powered!\n\n"
-                "✅ World's Best AI\n"
-                "✅ Coding Help 💻\n"
-                "✅ Knowledge 📚\n"
-                "✅ Fun 😂\n\n"
-                "/start | /clear | /id\n\n"
-                "Kuch bhi puchho! 🔥"
-            )
+            await update.message.reply_text("💎 GARAM GAND AI — Gemini Powered!\n\n✅ Best Free AI\n✅ Coding 💻\n✅ Knowledge 📚\n✅ Fun 😂\n\nKuch bhi puchho! 🔥")
         else:
             await update.message.reply_text("🔒 Permission nahi hai!")
     else:
@@ -391,15 +367,14 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message.text:
         return
     
-    user_input = message.text
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
     
     try:
-        bot_reply = get_ai_reply(user_input, chat_id)
+        bot_reply = get_ai_reply(message.text, chat_id)
         
         if chat_id not in user_history:
             user_history[chat_id] = []
-        user_history[chat_id].append({"role":"user","content":user_input})
+        user_history[chat_id].append({"role":"user","content":message.text})
         user_history[chat_id].append({"role":"assistant","content":bot_reply})
         user_history[chat_id] = user_history[chat_id][-15:]
         
@@ -423,9 +398,8 @@ def main():
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
     
-    print("💎 GARAM GAND AI — CHATGPT POWERED")
+    print("💎 GARAM GAND AI — GEMINI FREE")
     print(f"👑 Owner: {OWNER_USER_ID}")
-    print("✅ GPT-3.5 | World's Best AI | Guaranteed Reply")
     app.run_polling()
 
 if __name__ == "__main__":
