@@ -9,6 +9,7 @@ from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 # ==========================================
 
 # ================== OWNER SETUP ==================
@@ -77,54 +78,45 @@ def format_time(minutes):
     return ", ".join(parts) if parts else "0 seconds"
 
 def get_ai_reply(user_input, chat_id):
-    """Blackbox AI se free reply — no API key needed"""
+    """DeepSeek API se reply"""
     if chat_id not in user_history:
         user_history[chat_id] = []
     
-    # Previous messages ka context
-    history = user_history[chat_id]
-    context = ""
-    for msg in history[-4:]:
-        context += f"{msg['role']}: {msg['content']}\n"
+    messages = [{
+        "role": "system",
+        "content": "You are GARAM GAND AI, a helpful, friendly and smart assistant. Reply in user's language. Give accurate answers. Use emojis naturally. Be friendly like a smart friend. For coding give working code. Keep it simple and clean. No markdown formatting."
+    }]
     
-    full_prompt = f"""You are GARAM GAND AI, a helpful, friendly and smart assistant.
-
-Rules:
-- Reply in user's language (Hindi/English/Hinglish)
-- Give accurate and helpful answers
-- Use emojis naturally
-- Keep it simple and clean
-- No markdown, no special symbols
-- Be friendly like a smart friend
-- For coding questions, give working code
-- For general knowledge, give accurate info
-- For jokes, give real funny jokes
-- For advice, give genuine helpful advice
-
-Previous conversation:
-{context}
-
-User: {user_input}
-Assistant:"""
+    history = user_history[chat_id]
+    for msg in history[-6:]:
+        role = "user" if msg["role"] == "user" else "assistant"
+        messages.append({"role": role, "content": msg["content"]})
+    
+    messages.append({"role": "user", "content": user_input})
     
     try:
-        # Blackbox AI API — completely free
         response = requests.post(
-            "https://api.blackbox.ai/api/chat",
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json"
+            },
             json={
-                "messages": [{"role": "user", "content": full_prompt}],
-                "model": "deepseek-ai/DeepSeek-V3"
+                "model": "deepseek-chat",
+                "messages": messages,
+                "temperature": 0.8,
+                "max_tokens": 600
             },
             timeout=30
         )
         
-        if response.status_code == 200:
-            result = response.json()
-            return result.get("choices", [{}])[0].get("message", {}).get("content", "😅 Fir se bol bhai!")
+        result = response.json()
+        if "choices" in result:
+            return result["choices"][0]["message"]["content"]
         else:
-            return "😅 Thoda ruk ja bhai, fir se try kar!"
+            return "😅 Fir se try karo!"
     except:
-        return "😅 Network issue! Fir se bol."
+        return "😅 Network issue, fir se bol!"
 
 def is_user_allowed(user_id):
     return user_id in allowed_users
@@ -134,7 +126,7 @@ def is_user_allowed(user_id):
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != OWNER_USER_ID:
-        await update.message.reply_text("❌ Sirf Owner ye command use kar sakta hai!")
+        await update.message.reply_text("❌ Sirf Owner!")
         return
     
     if not context.args:
@@ -146,7 +138,7 @@ async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
         allowed_users.add(new_user_id)
         await update.message.reply_text(f"✅ User {new_user_id} added!")
     except:
-        await update.message.reply_text("❌ Valid User ID do!")
+        await update.message.reply_text("❌ Valid ID do!")
 
 async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -161,18 +153,17 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         remove_id = int(context.args[0])
         if remove_id == OWNER_USER_ID:
-            await update.message.reply_text("❌ Owner ko remove nahi kar sakte!")
+            await update.message.reply_text("❌ Owner ko nahi!")
             return
         allowed_users.discard(remove_id)
         await update.message.reply_text(f"✅ User {remove_id} removed!")
     except:
-        await update.message.reply_text("❌ Valid User ID do!")
+        await update.message.reply_text("❌ Valid ID do!")
 
 async def userlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID:
         await update.message.reply_text("❌ Sirf Owner!")
         return
-    
     user_list = "\n".join([f"• {uid} {'(Owner)' if uid==OWNER_USER_ID else ''}" for uid in allowed_users])
     await update.message.reply_text(f"👥 Allowed Users:\n\n{user_list}\n\nTotal: {len(allowed_users)}")
 
@@ -196,7 +187,7 @@ async def welcome_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=chat_id, text="🤖 GARAM GAND AI JOINED!\n\n👑 Admin /activate karo\n📢 Phir sabko reply milega!\n\n💻 Coding | 📚 Knowledge | 😂 Fun")
             continue
         
-        await context.bot.send_message(chat_id=chat_id, text=f"✨ Welcome {new_user.first_name}! 🎉\n💎 AI Replies | 🔇 Mute | ⚡ Fast\n📢 Kuch bhi puchho!")
+        await context.bot.send_message(chat_id=chat_id, text=f"✨ Welcome {new_user.first_name}! 🎉\n💎 AI Replies | 🔇 Mute | ⚡ Fast")
 
 # ================== MUTE ==================
 
@@ -206,7 +197,7 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_id = update.effective_user.id
     
     if chat_type == ChatType.PRIVATE:
-        await update.message.reply_text("⚡ Sirf group mein!")
+        await update.message.reply_text("⚡ Sirf group!")
         return
     
     try:
@@ -234,7 +225,7 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ ID galat!")
             return
     else:
-        await update.message.reply_text("🔇 /mute 10s 5m 2h 1d 30d\nReply karke bhejo!\n🇮🇳 IST | ⏰ Auto")
+        await update.message.reply_text("🔇 /mute 10s 5m 2h 1d 30d\nReply karke!\n🇮🇳 IST | ⏰ Auto")
         return
     
     if not target_user or target_user.id == admin_id or target_user.is_bot: return
@@ -331,11 +322,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     if chat_type == ChatType.PRIVATE:
-        if user_id == OWNER_USER_ID or is_user_allowed(user_id):
+        if is_user_allowed(user_id):
             user_history[chat_id] = []
             await update.message.reply_text(
-                "💎 Welcome to GARAM GAND AI!\n\n"
-                "✅ Best Free AI (Blackbox)\n"
+                "💎 GARAM GAND AI — DeepSeek Powered!\n\n"
+                "✅ Most Powerful AI\n"
                 "✅ Coding Help 💻\n"
                 "✅ Knowledge 📚\n"
                 "✅ Fun 😂\n\n"
@@ -429,9 +420,9 @@ def main():
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
     
-    print("💎 GARAM GAND AI — BLACKBOX (FREE)")
+    print("💎 GARAM GAND AI — DEEPSEEK POWERED")
     print(f"👑 Owner: {OWNER_USER_ID}")
-    print("✅ No API Key | Unlimited | Powerful")
+    print("✅ DeepSeek AI | Unlimited | Most Powerful")
     app.run_polling()
 
 if __name__ == "__main__":
