@@ -3,7 +3,7 @@ import asyncio
 import cohere
 import pytz
 from datetime import datetime, timedelta
-from telegram import Update, ChatPermissions, ChatMember
+from telegram import Update, ChatPermissions
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatType
 
@@ -14,33 +14,39 @@ COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 
 # ================== OWNER SETUP ==================
 OWNER_USER_ID = 7614459746
-OWNER_USERNAME = "@EgoFather_Ai_Bot"
-OWNER_NAME = "𝐁𝐄𝐒𝐓 𝘾𝙃𝙀𝘼𝙏 ᵒʷⁿᵉʳ"
 # =================================================
 
 co = cohere.Client(COHERE_API_KEY)
-
 IST = pytz.timezone('Asia/Kolkata')
 
 user_history = {}
 active_groups = {}
 
-PREMIUM_PREAMBLE = f"""Tu *GARAM GAND AI Bot* hai — ek *PREMIUM*, *MAST* aur *FUNNY* AI assistant.
-Tu {OWNER_NAME} ({OWNER_USERNAME}) ka bot hai.
+PREMIUM_PREAMBLE = """Tu ek PREMIUM AI Assistant hai.
 
 TERI PERSONALITY:
 • Mast, funny, thoda attitude wala lekin RESPECTFUL
 • Har sawal ka DETAILED, ACCURATE aur HELPFUL jawab
 • Emojis use kar: 🔥💯😂👊💎⚡🎯❤️🙏🌟✨
 • User ki LANGUAGE mein jawab de
-• NATURAL baat kar
-• Har reply PREMIUM aur STYLISH dikhna chahiye
-• Har reply ke end mein apne OWNER ka credit dena:
+• NATURAL baat kar, robot ki tarah nahi
+• Joke sunane ko bole to REAL FUNNY jokes de
+• Shayari bole to ORIGINAL SHAYARI likh
+• Code maange to PROPER WORKING code de
+• Advice maange to GENUINE HELPFUL advice de
+• Koi bhi topic — FULL CONFIDENCE se jawab
+• Har baat mein thoda SWAG
+• Desi + Classy mix
+• Kabhi boring nahi hona
+• Har reply MEMORABLE hona chahiye
 
-━━━━━━━━━━━━━━━━━━━━━━
-👑 Owner: {OWNER_NAME}
-📩 {OWNER_USERNAME}
-━━━━━━━━━━━━━━━━━━━━━━"""
+TERA REPLY STYLE:
+• Bold text use kar important cheeze highlight karne ke liye
+• Italic text use kar funny aur stylish feel ke liye
+• Emojis ke saath text aur mast lagna chahiye
+• Har reply PREMIUM aur STYLISH dikhna chahiye
+• Spacing aur formatting achi honi chahiye
+• Reply padhne mein MAZA aana chahiye"""
 
 def get_ist_now():
     return datetime.now(IST)
@@ -115,7 +121,7 @@ def get_premium_reply(user_input, chat_id):
         )
         return response.text
     except:
-        return f"_😅 Thoda sa ruk ja bhai!_ 💎\n\n━━━━━━━━━━━━━━━━━━━━━━\n👑 Owner: {OWNER_NAME}\n📩 {OWNER_USERNAME}\n━━━━━━━━━━━━━━━━━━━━━━"
+        return "_😅 Thoda sa ruk ja bhai, fir se bol!_ 💎"
 
 # ================== WELCOME ==================
 
@@ -129,10 +135,7 @@ async def welcome_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if new_user.id == context.bot.id:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text="👋 *GARAM GAND AI JOINED!* 💎\n\n"
-                     "👑 Admin `/activate` karo\n"
-                     "📢 Phir sabko premium reply milega!\n\n"
-                     f"👤 Owner: {OWNER_USERNAME}",
+                text="🤖 *Bot Joined!*\n\n👑 Admin `/activate` karo\n📢 Phir sabko premium reply milega! 🔥",
                 parse_mode="Markdown"
             )
             continue
@@ -142,20 +145,18 @@ async def welcome_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_name += f" {new_user.last_name}"
         
         welcome_text = (
-            f"✨ *WELCOME TO THE GROUP!* ✨\n\n"
+            f"✨ *WELCOME!* ✨\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"👤 *{user_name}*\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"🌟 _Aapka swagat hai!_ 🎉\n\n"
-            f"💎 Yahaan milega:\n"
+            f"🌟 _Aapka swagat hai group mein!_ 🎉\n\n"
+            f"💎 *Yahaan aapko milega:*\n"
             f"   • Premium AI Replies 🔥\n"
             f"   • Mute System 🔇\n"
-            f"   • Auto Unmute ⏰\n\n"
-            f"🤖 Bot: @BeStChEaT_OwNeR\n"
-            f"👑 Owner: {OWNER_NAME}\n"
-            f"📩 {OWNER_USERNAME}\n\n"
-            f"📢 Kuch bhi puchho — GARAM GAND jawab dega! 💬\n\n"
-            f"🔰 _Enjoy karo!_ 🤗"
+            f"   • Full Entertainment ⚡\n\n"
+            f"📢 Kuch bhi puchho, bhejo —\n"
+            f"   jawab milega pakka! 💬\n\n"
+            f"🔰 _Group mein enjoy karo!_ 🤗"
         )
         await context.bot.send_message(chat_id=chat_id, text=welcome_text, parse_mode="Markdown")
 
@@ -167,18 +168,16 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_id = update.effective_user.id
     
     if chat_type == ChatType.PRIVATE:
-        await update.message.reply_text("⚡ Sirf GROUP mein chalta hai!")
+        await update.message.reply_text("⚡ Sirf *GROUP* mein chalta hai!", parse_mode="Markdown")
         return
     
-    # Admin check - use get_chat_administrators
     try:
         admins = await context.bot.get_chat_administrators(chat_id)
-        admin_ids = [admin.user.id for admin in admins]
-        if admin_id not in admin_ids:
-            await update.message.reply_text("❌ Sirf GROUP ADMIN mute kar sakta hai! 👑")
+        if admin_id not in [a.user.id for a in admins]:
+            await update.message.reply_text("❌ Sirf *GROUP ADMIN* mute kar sakta hai! 👑", parse_mode="Markdown")
             return
-    except Exception as e:
-        await update.message.reply_text("❌ Bot ko ADMIN banao aur permissions do!")
+    except:
+        await update.message.reply_text("❌ Bot ko *ADMIN* banao pehle!", parse_mode="Markdown")
         return
     
     target_user = None
@@ -188,25 +187,32 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_user = update.message.reply_to_message.from_user
         if context.args:
             time_str = " ".join(context.args)
-    elif context.args:
-        if len(context.args) >= 2:
-            try:
-                target_id = int(context.args[0])
-                member = await context.bot.get_chat_member(chat_id, target_id)
-                target_user = member.user
-                time_str = " ".join(context.args[1:])
-            except:
-                await update.message.reply_text("❌ User ID galat!")
-                return
-        else:
-            await update.message.reply_text(
-                "🔇 *MUTE USAGE* 🇮🇳\n\n"
-                "Reply karke: `/mute 10 second`\n"
-                "Short: `/mute 25s` `/mute 5m` `/mute 2h` `/mute 1d`\n\n"
-                f"👑 Owner: {OWNER_USERNAME}",
-                parse_mode="Markdown"
-            )
+    elif context.args and len(context.args) >= 2:
+        try:
+            target_id = int(context.args[0])
+            target_user = (await context.bot.get_chat_member(chat_id, target_id)).user
+            time_str = " ".join(context.args[1:])
+        except:
+            await update.message.reply_text("❌ User ID galat!")
             return
+    else:
+        await update.message.reply_text(
+            "🔇 *MUTE USAGE* 🇮🇳\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "📌 *Reply karke:*\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "`/mute 10 second`\n"
+            "`/mute 5 minute`\n"
+            "`/mute 2 hour`\n"
+            "`/mute 1 day`\n\n"
+            "📌 *Short format:*\n"
+            "`/mute 25s` `/mute 5m`\n"
+            "`/mute 2h` `/mute 1d`\n"
+            "`/mute 30d` (max)\n\n"
+            "🇮🇳 IST Time | ⏰ Auto Unmute",
+            parse_mode="Markdown"
+        )
+        return
     
     if not target_user:
         await update.message.reply_text("❌ User nahi mila! Message ko reply karo.")
@@ -222,11 +228,11 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     mute_minutes = parse_time(time_str)
     if mute_minutes is None:
-        await update.message.reply_text("❌ Time: `10 second`, `5 minute`, `25s`, `5m`, `2h`, `1d`", parse_mode="Markdown")
+        await update.message.reply_text("❌ Time format galat! Use: `10 second`, `5 minute`, `25s`, `5m`, `2h`, `1d`", parse_mode="Markdown")
         return
     
     if mute_minutes > 43200:
-        await update.message.reply_text("❌ Max 30 days!")
+        await update.message.reply_text("❌ Max *30 days* tak mute kar sakte ho!", parse_mode="Markdown")
         return
     
     if mute_minutes <= 0:
@@ -241,19 +247,11 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=chat_id,
             user_id=target_user.id,
             permissions=ChatPermissions(
-                can_send_messages=False,
-                can_send_audios=False,
-                can_send_documents=False,
-                can_send_photos=False,
-                can_send_videos=False,
-                can_send_video_notes=False,
-                can_send_voice_notes=False,
-                can_send_polls=False,
-                can_send_other_messages=False,
-                can_add_web_page_previews=False,
-                can_change_info=False,
-                can_invite_users=False,
-                can_pin_messages=False
+                can_send_messages=False, can_send_audios=False, can_send_documents=False,
+                can_send_photos=False, can_send_videos=False, can_send_video_notes=False,
+                can_send_voice_notes=False, can_send_polls=False, can_send_other_messages=False,
+                can_add_web_page_previews=False, can_change_info=False,
+                can_invite_users=False, can_pin_messages=False
             ),
             until_date=until_ist
         )
@@ -265,13 +263,21 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await update.message.reply_text(
             f"🔇 *MUTED! — INDIA TIME* 🇮🇳\n\n"
-            f"👤 User: {target_name}\n"
-            f"👑 By: {admin_name}\n"
-            f"⏱️ Duration: {format_time(mute_minutes)}\n\n"
-            f"📅 Muted: `{now_ist.strftime('%I:%M:%S %p, %d %b %Y')}`\n"
-            f"🔓 Unmute: `{until_ist.strftime('%I:%M:%S %p, %d %b %Y')}`\n\n"
-            f"⏰ Auto Unmute ON\n\n"
-            f"👑 Owner: {OWNER_USERNAME}",
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 *User:* {target_name}\n"
+            f"🆔 ID: `{target_user.id}`\n"
+            f"👑 *By:* {admin_name}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⏱️ *Duration:* {format_time(mute_minutes)}\n\n"
+            f"📅 *Muted at:*\n"
+            f"   🕐 `{now_ist.strftime('%I:%M:%S %p')}`\n"
+            f"   📆 {now_ist.strftime('%d %B %Y')}\n\n"
+            f"🔓 *Unmute at:*\n"
+            f"   🕐 `{until_ist.strftime('%I:%M:%S %p')}`\n"
+            f"   📆 {until_ist.strftime('%d %B %Y')}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏰ Time khatam hone par *AUTO UNMUTE* hoga!\n"
+            f"🔊 Ya `/unmute` reply karke manual unmute",
             parse_mode="Markdown"
         )
         
@@ -279,27 +285,21 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(mute_minutes * 60)
             try:
                 await context.bot.restrict_chat_member(
-                    chat_id=chat_id,
-                    user_id=target_user.id,
+                    chat_id=chat_id, user_id=target_user.id,
                     permissions=ChatPermissions(
-                        can_send_messages=True,
-                        can_send_audios=True,
-                        can_send_documents=True,
-                        can_send_photos=True,
-                        can_send_videos=True,
-                        can_send_video_notes=True,
-                        can_send_voice_notes=True,
-                        can_send_polls=True,
-                        can_send_other_messages=True,
-                        can_add_web_page_previews=True,
-                        can_change_info=False,
-                        can_invite_users=False,
-                        can_pin_messages=False
+                        can_send_messages=True, can_send_audios=True, can_send_documents=True,
+                        can_send_photos=True, can_send_videos=True, can_send_video_notes=True,
+                        can_send_voice_notes=True, can_send_polls=True, can_send_other_messages=True,
+                        can_add_web_page_previews=True, can_change_info=False,
+                        can_invite_users=False, can_pin_messages=False
                     )
                 )
                 await context.bot.send_message(
                     chat_id=chat_id,
-                    text=f"✅ *AUTO UNMUTED!* 🇮🇳\n👤 {target_name}\n⏱️ Mute khatam! 💬",
+                    text=f"✅ *AUTO UNMUTED!* 🇮🇳\n\n"
+                         f"👤 *{target_name}*\n"
+                         f"⏱️ {format_time(mute_minutes)} ka mute khatam!\n"
+                         f"💬 _Ab message kar sakta hai!_ 🎉",
                     parse_mode="Markdown"
                 )
             except:
@@ -309,10 +309,11 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         await update.message.reply_text(
-            f"❌ Mute fail!\n\n"
+            f"❌ *Mute fail!*\n\n"
             f"⚠️ Bot ko yeh permissions do:\n"
-            f"✅ Ban Users ✅ Delete Messages\n\n"
-            f"Error: `{str(e)[:80]}`"
+            f"✅ Ban Users\n✅ Delete Messages\n\n"
+            f"Error: `{str(e)[:80]}`",
+            parse_mode="Markdown"
         )
 
 async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -321,14 +322,13 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_id = update.effective_user.id
     
     if chat_type == ChatType.PRIVATE:
-        await update.message.reply_text("⚡ Sirf GROUP mein!")
+        await update.message.reply_text("⚡ Sirf *GROUP* mein!", parse_mode="Markdown")
         return
     
     try:
         admins = await context.bot.get_chat_administrators(chat_id)
-        admin_ids = [admin.user.id for admin in admins]
-        if admin_id not in admin_ids:
-            await update.message.reply_text("❌ Sirf GROUP ADMIN!")
+        if admin_id not in [a.user.id for a in admins]:
+            await update.message.reply_text("❌ Sirf *GROUP ADMIN*!", parse_mode="Markdown")
             return
     except:
         return
@@ -338,9 +338,7 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_user = update.message.reply_to_message.from_user
     elif context.args:
         try:
-            target_id = int(context.args[0])
-            member = await context.bot.get_chat_member(chat_id, target_id)
-            target_user = member.user
+            target_user = (await context.bot.get_chat_member(chat_id, int(context.args[0]))).user
         except:
             await update.message.reply_text("❌ User ID galat!")
             return
@@ -354,28 +352,22 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         await context.bot.restrict_chat_member(
-            chat_id=chat_id,
-            user_id=target_user.id,
+            chat_id=chat_id, user_id=target_user.id,
             permissions=ChatPermissions(
-                can_send_messages=True,
-                can_send_audios=True,
-                can_send_documents=True,
-                can_send_photos=True,
-                can_send_videos=True,
-                can_send_video_notes=True,
-                can_send_voice_notes=True,
-                can_send_polls=True,
-                can_send_other_messages=True,
-                can_add_web_page_previews=True,
-                can_change_info=False,
-                can_invite_users=False,
-                can_pin_messages=False
+                can_send_messages=True, can_send_audios=True, can_send_documents=True,
+                can_send_photos=True, can_send_videos=True, can_send_video_notes=True,
+                can_send_voice_notes=True, can_send_polls=True, can_send_other_messages=True,
+                can_add_web_page_previews=True, can_change_info=False,
+                can_invite_users=False, can_pin_messages=False
             )
         )
         target_name = target_user.first_name or "User"
         now_ist = get_ist_now()
         await update.message.reply_text(
-            f"✅ *UNMUTED!* 🇮🇳\n👤 {target_name}\n🔓 `{now_ist.strftime('%I:%M:%S %p, %d %b %Y')}`\n💬 Ab message kar sakta hai! 🎉",
+            f"✅ *UNMUTED!* 🇮🇳\n\n"
+            f"👤 *User:* {target_name}\n"
+            f"🔓 *At:* `{now_ist.strftime('%I:%M:%S %p, %d %B %Y')}`\n\n"
+            f"💬 _Ab message kar sakta hai!_ 🎉",
             parse_mode="Markdown"
         )
     except Exception as e:
@@ -384,12 +376,18 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def mutelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🔇 *MUTE HELP* 🇮🇳\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "📌 *MUTE (reply karke):*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
         "`/mute 10 second` | `25s`\n"
         "`/mute 5 minute` | `5m`\n"
         "`/mute 2 hour` | `2h`\n"
-        "`/mute 1 day` | `1d`\n\n"
-        "🔊 `/unmute` reply karke\n"
-        f"👑 Owner: {OWNER_USERNAME}",
+        "`/mute 1 day` | `1d`\n"
+        "`/mute 30d` (max)\n\n"
+        "📌 *UNMUTE:* `/unmute` reply\n"
+        "📌 *Manual:* `/mute ID time`\n\n"
+        "⏰ *Auto Unmute* ON\n"
+        "👑 Admin only | 🇮🇳 IST Time",
         parse_mode="Markdown"
     )
 
@@ -406,18 +404,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "💎 *WELCOME BACK BOSS!* 💎\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🔥 *SYSTEMS ACTIVE:*\n"
+            "🔥 *PREMIUM SYSTEMS ACTIVE:*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "✅ Premium AI Replies\n"
-            "✅ Mute System 🇮🇳\n"
-            "✅ Auto Unmute ⏰\n"
-            "✅ New User Welcome 👋\n"
-            "✅ All Media Support 🖼️\n"
-            "✅ Private Lock 🔒\n\n"
-            "⚡ /start | /clear | /activate\n"
-            "🔇 /mute | /unmute | /mutelist\n\n"
-            f"👑 *Owner:* {OWNER_NAME}\n"
-            f"📩 {OWNER_USERNAME}\n\n"
+            "✅ *Premium AI Replies*\n"
+            "✅ *Stylish Bold+Italic Text*\n"
+            "✅ *Mute System* 🇮🇳\n"
+            "✅ *Auto Unmute* ⏰\n"
+            "✅ *New User Welcome* 👋\n"
+            "✅ *All Media Support* 🖼️\n"
+            "✅ *Private Lock* 🔒\n\n"
+            "⚡ *COMMANDS:*\n"
+            "/start | /clear | /activate\n"
+            "/mute | /unmute | /mutelist\n\n"
             "_Bolo boss, kya chahiye?_ 🔥",
             parse_mode="Markdown"
         )
@@ -429,9 +427,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔒 *PRIVATE BOT* 🔒\n\n"
             "_Ye bot sirf OWNER ke liye hai!_ 👑\n\n"
             "💡 *Group mein add karo* —\n"
-            "   wahan sabko premium reply milega!\n\n"
-            f"👑 Owner: {OWNER_NAME}\n"
-            f"📩 {OWNER_USERNAME}",
+            "   wahan sabko premium reply milega!\n"
+            "   New users ka welcome bhi hoga! ✨",
             parse_mode="Markdown"
         )
         return
@@ -440,11 +437,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_history[chat_id] = []
     await update.message.reply_text(
         "👋 *GARAM GAND AI READY!* 💎\n\n"
-        "👑 Admin: `/activate` karo\n"
-        "🔇 `/mute` — Mute user\n"
-        "🔊 `/unmute` — Unmute\n"
-        "📋 `/mutelist` — Help\n\n"
-        f"👑 Owner: {OWNER_USERNAME}",
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "👑 *Admin Commands:*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🔘 /activate — Bot ON\n"
+        "🔇 /mute — Mute user\n"
+        "🔊 /unmute — Unmute\n"
+        "📋 /mutelist — Help\n\n"
+        "✨ *Features:*\n"
+        "• ⏰ Auto Unmute\n"
+        "• 💬 Premium AI Reply\n"
+        "• 👋 New User Welcome\n\n"
+        "_Activate karo, phir enjoy karo!_ 🔥",
         parse_mode="Markdown"
     )
 
@@ -454,27 +458,28 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     if chat_type == ChatType.PRIVATE:
-        await update.message.reply_text("⚡ Sirf GROUP mein!")
+        await update.message.reply_text("⚡ Sirf *GROUP* mein!", parse_mode="Markdown")
         return
     
-    # Check if user is admin using get_chat_administrators
     try:
         admins = await context.bot.get_chat_administrators(chat_id)
-        admin_ids = [admin.user.id for admin in admins]
-        if user_id not in admin_ids:
+        if user_id not in [a.user.id for a in admins]:
             await update.message.reply_text(
                 "❌ *Sirf GROUP ADMIN activate kar sakta hai!* 👑\n\n"
-                "Steps:\n"
-                "1️⃣ Bot ko ADMIN banao\n"
-                "2️⃣ Sab permissions ON karo\n"
-                "3️⃣ Phir `/activate` bhejo",
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "📌 *STEPS:*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "1️⃣ Bot ko *ADMIN* banao\n"
+                "2️⃣ Sab *permissions ON* karo\n"
+                "3️⃣ Phir `/activate` bhejo\n\n"
+                "_Tab main group mein reply dunga!_ 💬",
                 parse_mode="Markdown"
             )
             return
-    except Exception as e:
+    except:
         await update.message.reply_text(
             "❌ *Bot ko ADMIN banao pehle!*\n\n"
-            "Group Settings → Administrators → Add Admin → @BeStChEaT_OwNeR",
+            "Group Settings → Administrators → Add Admin → Bot select karo → Sab permissions ON",
             parse_mode="Markdown"
         )
         return
@@ -486,33 +491,34 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         "🌟 *AB SAB KUCH ON:*\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "💬 Premium AI Replies\n"
-        "🔇 Mute System\n"
-        "⏰ Auto Unmute\n"
-        "👋 New User Welcome\n\n"
-        "📢 Sab kuch bhejo —\n"
-        "   GARAM GAND jawab dega! 💎\n\n"
-        f"👑 Owner: {OWNER_NAME}\n"
-        f"📩 {OWNER_USERNAME}\n\n"
+        "💬 *Premium AI Replies*\n"
+        "🔇 *Mute System*\n"
+        "⏰ *Auto Unmute*\n"
+        "👋 *New User Welcome*\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "📢 _Sab kuch bhejo —_\n"
+        "   _GARAM GAND jawab dega!_ 💎\n\n"
         "❌ /deactivate — Band karo",
         parse_mode="Markdown"
     )
 
 async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    chat_type = update.effective_chat.type
-    
-    if chat_type == ChatType.PRIVATE:
-        await update.message.reply_text("⚡ Sirf GROUP!")
+    if update.effective_chat.type == ChatType.PRIVATE:
+        await update.message.reply_text("⚡ Sirf *GROUP*!", parse_mode="Markdown")
         return
     
     active_groups[chat_id] = False
-    await update.message.reply_text("🔴 *DEACTIVATED!* /activate se on karo", parse_mode="Markdown")
+    await update.message.reply_text(
+        "🔴 *GROUP DEACTIVATED!*\n"
+        "_/activate se wapas on karo_",
+        parse_mode="Markdown"
+    )
 
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_history[chat_id] = []
-    await update.message.reply_text("✅ Memory Clear! 💭")
+    await update.message.reply_text("✅ *Memory Clear!* 💭", parse_mode="Markdown")
 
 # ================== MESSAGE HANDLER ==================
 
@@ -532,10 +538,10 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id != OWNER_USER_ID:
             await update.message.reply_text(
                 "🔒 *PRIVATE BOT* 🔒\n\n"
-                "Private mein sirf OWNER use kar sakta hai! 👑\n\n"
-                "💡 Group mein add karo — sabko reply milega!\n\n"
-                f"👑 Owner: {OWNER_NAME}\n"
-                f"📩 {OWNER_USERNAME}",
+                "_Private mein sirf OWNER use kar sakta hai!_ 👑\n\n"
+                "💡 Mujhe *GROUP* mein add karo —\n"
+                "   wahan *SABKO* premium reply milega!\n"
+                "   New users ka welcome bhi hoga! ✨",
                 parse_mode="Markdown"
             )
             return
@@ -548,32 +554,40 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message.text:
         user_input = message.text
     elif message.caption:
-        user_input = f"[Media]: {message.caption}"
+        if message.photo:
+            user_input = f"🖼️ *[PHOTO]* — {message.caption}"
+        elif message.video:
+            user_input = f"🎬 *[VIDEO]* — {message.caption}"
+        elif message.document:
+            user_input = f"📄 *[DOCUMENT]* — {message.caption}"
+        else:
+            user_input = f"📨 *[Media]* — {message.caption}"
     elif message.photo:
-        user_input = "🖼️ Photo bheji — mazedaar reaction de"
+        user_input = "🖼️ _Photo bheji hai — iska mazedaar aur stylish reaction de_"
     elif message.video:
-        user_input = "🎬 Video bheja — mazedaar reaction de"
+        user_input = "🎬 _Video bheja hai — iska mazedaar aur stylish reaction de_"
     elif message.sticker:
         emoji = message.sticker.emoji or ""
-        user_input = f"🎯 Sticker {emoji} — funny reaction de"
+        user_input = f"🎯 _Sticker bheja hai {emoji} — ispe funny aur stylish reaction de_"
     elif message.voice:
-        user_input = "🎵 Voice message — funny comment kar"
+        user_input = "🎵 _Voice message bheja hai — funny aur stylish comment kar_"
     elif message.audio:
-        user_input = "🎧 Audio — music pe baat kar"
+        user_input = "🎧 _Audio bheja hai — music pe stylish baat kar_"
     elif message.document:
-        user_input = "📄 Document — iske baare mein bol"
+        doc_name = message.document.file_name or "file"
+        user_input = f"📄 _Document bheja hai: *{doc_name}* — iske baare mein stylish bol_"
     elif message.animation:
-        user_input = "🎞️ GIF — mazedaar reaction de"
+        user_input = "🎞️ _GIF bheja hai — mazedaar aur stylish reaction de_"
     elif message.video_note:
-        user_input = "📹 Video note — funny comment"
+        user_input = "📹 _Video note bheja hai — funny stylish comment_"
     elif message.location:
-        user_input = "📍 Location — puchho kahan ho"
+        user_input = "📍 _Location bheji hai — stylish puchho kahan ho_"
     elif message.contact:
-        user_input = "👤 Contact — mazedaar comment"
+        user_input = "👤 _Contact share kiya hai — mazedaar stylish comment_"
     elif message.poll:
-        user_input = "📊 Poll — vote karne ko bol"
+        user_input = "📊 _Poll banaya hai — stylish vote karne ko bol_"
     else:
-        user_input = "📨 Kuch bheja — curious reaction de"
+        user_input = "📨 _Kuch bheja hai — curious stylish reaction de_"
 
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
     
@@ -602,9 +616,10 @@ def main():
     app.add_handler(CommandHandler("mutelist", mutelist))
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
     
-    print("💎 GARAM GAND AI — 100% WORKING")
-    print(f"👑 Owner: {OWNER_NAME} | ID: {OWNER_USER_ID}")
+    print("💎 GARAM GAND AI — PURE PREMIUM BOT")
+    print(f"👑 Owner ID: {OWNER_USER_ID}")
     print("✅ Private: Owner Only | Group: Sabko Reply")
+    print("🔇 Mute | 🔊 Unmute | ⏰ Auto Unmute | 👋 Welcome")
     app.run_polling()
 
 if __name__ == "__main__":
