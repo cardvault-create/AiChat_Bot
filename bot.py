@@ -14,8 +14,8 @@ COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 
 # ================== OWNER SETUP ==================
 OWNER_USER_ID = 7614459746
-OWNER_USERNAME = "@BeStChEaT_OwNeR"
-OWNER_NAME = "BEST CHEAT OWNER"
+OWNER_USERNAME = "@EgoFather_Ai_Bot"
+OWNER_NAME = "𝐁𝐄𝐒𝐓 𝘾𝙃𝙀𝘼𝙏 ᵒʷⁿᵉʳ"
 # =================================================
 
 co = cohere.Client(COHERE_API_KEY)
