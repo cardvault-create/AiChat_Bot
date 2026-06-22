@@ -9,7 +9,7 @@ from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+OPENAI_API_KEY = os.environ.get("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")
 # ==========================================
 
 # ================== OWNER SETUP ==================
@@ -78,13 +78,13 @@ def format_time(minutes):
     return ", ".join(parts) if parts else "0 seconds"
 
 def get_ai_reply(user_input, chat_id):
-    """DeepSeek API se reply"""
+    """ChatGPT API se reply"""
     if chat_id not in user_history:
         user_history[chat_id] = []
     
     messages = [{
         "role": "system",
-        "content": "You are GARAM GAND AI, a helpful, friendly and smart assistant. Reply in user's language. Give accurate answers. Use emojis naturally. Be friendly like a smart friend. For coding give working code. Keep it simple and clean. No markdown formatting."
+        "content": "You are GARAM GAND AI, a helpful, friendly and smart assistant. Reply in user's language (Hindi/English/Hinglish). Give accurate answers. Use emojis naturally. Be friendly like a best friend. For coding give working code with explanation. Keep it simple and clear. No markdown formatting."
     }]
     
     history = user_history[chat_id]
@@ -96,13 +96,13 @@ def get_ai_reply(user_input, chat_id):
     
     try:
         response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
+            "https://api.openai.com/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
                 "Content-Type": "application/json"
             },
             json={
-                "model": "deepseek-chat",
+                "model": "gpt-3.5-turbo",
                 "messages": messages,
                 "temperature": 0.8,
                 "max_tokens": 600
@@ -114,7 +114,10 @@ def get_ai_reply(user_input, chat_id):
         if "choices" in result:
             return result["choices"][0]["message"]["content"]
         else:
-            return "😅 Fir se try karo!"
+            error_msg = result.get("error", {}).get("message", "Unknown")
+            if "insufficient" in error_msg.lower():
+                return "💰 OpenAI balance khatam! Thoda wait karo."
+            return f"😅 Error: {error_msg[:50]}"
     except:
         return "😅 Network issue, fir se bol!"
 
@@ -184,10 +187,10 @@ async def welcome_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     for new_user in update.message.new_chat_members:
         if new_user.id == context.bot.id:
-            await context.bot.send_message(chat_id=chat_id, text="🤖 GARAM GAND AI JOINED!\n\n👑 Admin /activate karo\n📢 Phir sabko reply milega!\n\n💻 Coding | 📚 Knowledge | 😂 Fun")
+            await context.bot.send_message(chat_id=chat_id, text="🤖 GARAM GAND AI JOINED!\n\n👑 Admin /activate karo\n📢 Phir sabko ChatGPT reply milega!\n\n💻 Coding | 📚 Knowledge | 😂 Fun")
             continue
         
-        await context.bot.send_message(chat_id=chat_id, text=f"✨ Welcome {new_user.first_name}! 🎉\n💎 AI Replies | 🔇 Mute | ⚡ Fast")
+        await context.bot.send_message(chat_id=chat_id, text=f"✨ Welcome {new_user.first_name}! 🎉\n💎 ChatGPT Replies | 🔇 Mute | ⚡ Fast")
 
 # ================== MUTE ==================
 
@@ -325,8 +328,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_user_allowed(user_id):
             user_history[chat_id] = []
             await update.message.reply_text(
-                "💎 GARAM GAND AI — DeepSeek Powered!\n\n"
-                "✅ Most Powerful AI\n"
+                "💎 GARAM GAND AI — ChatGPT Powered!\n\n"
+                "✅ World's Best AI\n"
                 "✅ Coding Help 💻\n"
                 "✅ Knowledge 📚\n"
                 "✅ Fun 😂\n\n"
@@ -420,9 +423,9 @@ def main():
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
     
-    print("💎 GARAM GAND AI — DEEPSEEK POWERED")
+    print("💎 GARAM GAND AI — CHATGPT POWERED")
     print(f"👑 Owner: {OWNER_USER_ID}")
-    print("✅ DeepSeek AI | Unlimited | Most Powerful")
+    print("✅ GPT-3.5 | World's Best AI | Guaranteed Reply")
     app.run_polling()
 
 if __name__ == "__main__":
