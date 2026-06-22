@@ -58,7 +58,7 @@ def format_time(minutes):
 def get_ai_reply(user_input, chat_id):
     if chat_id not in user_history: user_history[chat_id] = []
     
-    messages = [{"role":"system","content":"You are GARAM GAND AI, a premium friendly assistant. Give complete answers. Use emojis. Reply in user's language. Be helpful and natural."}]
+    messages = [{"role":"system","content":"You are GARAM GAND AI, a premium friendly assistant. Give complete answers. Use emojis. Reply in user's language."}]
     
     for msg in user_history[chat_id][-4:]:
         role = "user" if msg["role"]=="user" else "assistant"
@@ -66,27 +66,28 @@ def get_ai_reply(user_input, chat_id):
     
     messages.append({"role":"user","content":user_input})
     
-    try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "google/gemini-2.0-flash-001",
-                "messages": messages,
-                "temperature": 0.8,
-                "max_tokens": 500
-            },
-            timeout=25
-        )
-        data = response.json()
-        if "choices" in data:
-            return data["choices"][0]["message"]["content"]
-        return "😅 Error: " + str(data.get("error",{}).get("message",""))[:60]
-    except:
-        return "😅 Network issue!"
+    models = [
+        "google/gemini-flash-1.5",
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "google/gemma-2-9b-it:free",
+        "mistralai/mistral-7b-instruct:free"
+    ]
+    
+    for model_name in models:
+        try:
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization":f"Bearer {OPENROUTER_API_KEY}","Content-Type":"application/json"},
+                json={"model":model_name,"messages":messages,"temperature":0.8,"max_tokens":500},
+                timeout=20
+            )
+            data = response.json()
+            if "choices" in data:
+                return data["choices"][0]["message"]["content"]
+        except:
+            continue
+    
+    return "😅 Sab models busy hain! Fir se try karo."
 
 def is_allowed(uid): return uid in allowed_users
 
@@ -112,8 +113,7 @@ async def userlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.reply_to_message:
-        t = update.message.reply_to_message.from_user
-        await update.message.reply_text(f"🆔 {t.id}")
+        await update.message.reply_text(f"🆔 {update.message.reply_to_message.from_user.id}")
     else: await update.message.reply_text(f"🆔 {update.effective_user.id}")
 
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -139,7 +139,7 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif context.args and len(context.args)>=2:
         try: target = (await context.bot.get_chat_member(cid,int(context.args[0]))).user; ts = " ".join(context.args[1:])
         except: return
-    else: await update.message.reply_text("🔇 /mute 10s 5m 2h 1d\nReply!"); return
+    else: await update.message.reply_text("🔇 /mute 10s 5m 2h 1d"); return
     
     if not target or target.id==update.effective_user.id or target.is_bot: return
     mm = parse_time(ts)
@@ -152,8 +152,7 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         tn = target.first_name or "User"
         if target.last_name: tn += f" {target.last_name}"
-        
-        await update.message.reply_text(f"🔇 MUTED!\n👤 {tn}\n⏱️ {format_time(mm)}\n🔓 {ut.strftime('%I:%M %p, %d %b')}\n⏰ Auto ON")
+        await update.message.reply_text(f"🔇 MUTED!\n👤 {tn}\n⏱️ {format_time(mm)}\n🔓 {ut.strftime('%I:%M %p, %d %b')}\n⏰ Auto")
         
         async def auto():
             await asyncio.sleep(mm*60)
@@ -183,9 +182,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id; ct = update.effective_chat.type; uid = update.effective_user.id
     if ct == ChatType.PRIVATE and is_allowed(uid):
         user_history[cid] = []
-        await update.message.reply_text("💎 GARAM GAND AI — UNLIMITED!\n\n✅ OpenRouter AI\n✅ No Limits\n✅ Always Online\n\nKuch bhi puchho! 🔥")
+        await update.message.reply_text("💎 GARAM GAND AI — OPENROUTER!\n\n✅ Unlimited AI\n✅ No Daily Limit\n✅ Always Online\n\nKuch bhi puchho! 🔥")
     elif ct == ChatType.PRIVATE: await update.message.reply_text("🔒 Permission nahi!")
-    else: user_history[cid] = []; await update.message.reply_text("👋 /activate karo!")
+    else: user_history[cid] = []; await update.message.reply_text("👋 /activate!")
 
 async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
@@ -224,6 +223,6 @@ def main():
     for cmd, fn in [("start",start),("activate",activate),("deactivate",deactivate),("clear",clear),("mute",mute_user),("unmute",unmute_user),("adduser",adduser),("removeuser",removeuser),("userlist",userlist),("id",get_id)]:
         app.add_handler(CommandHandler(cmd,fn))
     app.add_handler(MessageHandler(filters.ALL,handle))
-    print("💎 OPENROUTER BOT READY!"); app.run_polling()
+    print("💎 OPENROUTER READY!"); app.run_polling()
 
 if __name__ == "__main__": main()
