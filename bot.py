@@ -1,19 +1,42 @@
 import os
-import google.generativeai as genai
+import requests
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")  # 👈 Naya variable
 # ==========================================
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-2.0-flash')
+# DeepSeek API URL
+DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 
 user_history = {}
 active_groups = set()
+
+def get_ai_reply(user_input, history):
+    messages = [{"role": "system", "content": "Tu ek mast, funny aur helpful AI assistant hai. Thoda attitude wala, thoda funny. User ki language mein jawab de."}]
+    
+    for msg in history[-5:]:
+        role = "user" if msg["role"] == "user" else "assistant"
+        messages.append({"role": role, "content": msg["content"]})
+    
+    messages.append({"role": "user", "content": user_input})
+    
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "model": "deepseek-chat",
+        "messages": messages
+    }
+    
+    response = requests.post(DEEPSEEK_URL, headers=headers, json=data)
+    result = response.json()
+    return result["choices"][0]["message"]["content"]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -21,11 +44,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Hello! Main GARAM GAND AI Bot hoon!\n\n"
         "🔥 Har ek cheez ka reply doonga!\n"
-        "📝 Text | 🖼️ Photo | 🎵 Voice | 🎬 Video | 🎯 Sticker | 📄 Document\n\n"
-        "/start - Restart\n"
-        "/clear - Memory clear\n"
-        "/activate - Group ON (admin)\n"
-        "/deactivate - Group OFF (admin)"
+        "📝 Text | 🖼️ Photo | 🎵 Voice | 🎬 Video | 🎯 Sticker\n\n"
+        "/start - Restart\n/clear - Memory clear\n"
+        "/activate - Group ON\n/deactivate - Group OFF"
     )
 
 async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -61,8 +82,6 @@ async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         member = await context.bot.get_chat_member(chat_id, user_id)
         if member.status in ['administrator', 'creator']:
             active_groups.discard(chat_id)
-            if chat_id in user_history:
-                del user_history[chat_id]
             await update.message.reply_text("🔴 Bot DEACTIVATED!")
     except:
         await update.message.reply_text("❌ Pehle bot ko GROUP ADMIN banao!")
@@ -77,82 +96,54 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_type = update.effective_chat.type
     message = update.message
     
-    # Group check
     if chat_type != ChatType.PRIVATE and chat_id not in active_groups:
         return
     
-    # ========== MESSAGE TYPE DETECT ==========
     if message.text:
         user_input = message.text
     elif message.caption:
-        user_input = f"[Media with caption]: {message.caption}"
+        user_input = f"[Media]: {message.caption}"
     elif message.photo:
-        user_input = "🖼️ [Photo bheja gaya]"
+        user_input = "🖼️ [Photo]"
     elif message.video:
-        user_input = "🎬 [Video bheja gaya]"
+        user_input = "🎬 [Video]"
     elif message.sticker:
         emoji = message.sticker.emoji or "❓"
-        user_input = f"🎯 [Sticker bheja gaya] Emoji: {emoji}"
+        user_input = f"🎯 [Sticker] {emoji}"
     elif message.voice:
-        user_input = "🎵 [Voice message bheja gaya]"
+        user_input = "🎵 [Voice]"
     elif message.audio:
-        user_input = f"🎧 [Audio bheja gaya]"
+        user_input = "🎧 [Audio]"
     elif message.document:
-        user_input = f"📄 [Document bheja gaya] {message.document.file_name or ''}"
+        user_input = f"📄 [File] {message.document.file_name or ''}"
     elif message.animation:
-        user_input = "🎞️ [GIF bheja gaya]"
-    elif message.video_note:
-        user_input = "📹 [Video note bheja gaya]"
+        user_input = "🎞️ [GIF]"
     elif message.location:
-        user_input = "📍 [Location bheja gaya]"
+        user_input = "📍 [Location]"
     elif message.contact:
-        user_input = f"👤 [Contact bheja gaya]"
+        user_input = "👤 [Contact]"
     elif message.poll:
-        user_input = f"📊 [Poll bheja gaya]"
+        user_input = f"📊 [Poll]"
     else:
-        user_input = "📨 [Kuch bheja gaya]"
+        user_input = "📨 [Message]"
 
-    # Typing indicator
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
     
     try:
         if chat_id not in user_history:
             user_history[chat_id] = []
         
-        prompt = """Tu ek mast, funny aur helpful AI assistant hai.
-GARAM GAND AI Bot ke naam se jaana jaata hai.
-Thoda attitude wala, thoda funny, lekin fully helpful.
-User ki language mein jawab de. Natural baat kar.\n\n"""
+        bot_reply = get_ai_reply(user_input, user_history[chat_id])
         
-        for msg in user_history[chat_id][-5:]:
-            prompt += f"{msg['role']}: {msg['content']}\n"
-        
-        prompt += f"user: {user_input}\nassistant:"
-        
-        # Gemini se jawab
-        response = model.generate_content(prompt)
-        bot_reply = response.text
-        
-        # History save
         user_history[chat_id].append({"role": "user", "content": user_input})
         user_history[chat_id].append({"role": "assistant", "content": bot_reply})
         user_history[chat_id] = user_history[chat_id][-20:]
         
-        # Jawab bhejo
         await message.reply_text(bot_reply)
         
     except Exception as e:
-        error_text = str(e)
-        print(f"Error: {error_text}")
-        
-        # Agar quota khatam ho gaya
-        if "quota" in error_text.lower() or "rate" in error_text.lower():
-            await message.reply_text("😴 Thoda rest kar raha hoon, thodi der baad try karo!")
-        # Agar API key problem
-        elif "api" in error_text.lower() or "key" in error_text.lower():
-            await message.reply_text("🔑 API Key problem hai! Nayi key set karo.")
-        else:
-            await message.reply_text(f"😅 Error: {error_text[:100]}")
+        print(f"Error: {e}")
+        await message.reply_text("😅 Fir se try karo!")
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -164,7 +155,7 @@ def main():
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
     
     print("=" * 50)
-    print("🔥 GARAM GAND AI Bot Started!")
+    print("🔥 GARAM GAND AI Bot Started! (DeepSeek)")
     print("=" * 50)
     
     app.run_polling()
