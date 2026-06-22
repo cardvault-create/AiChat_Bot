@@ -6,7 +6,7 @@ from telegram.constants import ChatType
 
 # ================== ENVIRONMENT VARIABLES ==================
 TELEGRAM_TOKEN = os.environ.get("8865931839:AAFQbF2U0NRWNJ-5pabVh4r8gKTq1aqtJYY")
-GEMINI_API_KEY = os.environ.get("AQ.Ab8RN6L-Wmvh3z-a-RTDNp5aRY7jgyyLFu2QVQDNfz0TQ3POCw")
+GEMINI_API_KEY = os.environ.get("AQ.Ab8RN6JWQxKV1BLYeKWorV5wMuPqcGEwlD3Z2eWaTKSmgoTPLw")
 
 # Check karo keys hain ya nahi
 if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
