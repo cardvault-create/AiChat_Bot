@@ -13,8 +13,10 @@ COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 # ==========================================
 
 # ================== OWNER SETUP ==================
-OWNER_USER_ID = 7614459746  # 👈 APNI USER ID YAHAN DALO
-BOT_USERNAME = "@BeStChEaT_OwNeR"  # 👈 BOT USERNAME
+OWNER_USER_ID = 7614459746
+OWNER_USERNAME = "@BeStChEaT_OwNeR"
+OWNER_NAME = "BEST CHEAT OWNER"
+BOT_USERNAME = "@BeStChEaT_OwNeR"
 # =================================================
 
 co = cohere.Client(COHERE_API_KEY)
@@ -26,7 +28,8 @@ active_groups = set()
 
 # ================== PREMIUM STYLISH AI ==================
 
-PREMIUM_PREAMBLE = """Tu *GARAM GAND AI Bot* hai — ek *PREMIUM*, *MAST* aur *FUNNY* AI assistant.
+PREMIUM_PREAMBLE = f"""Tu *GARAM GAND AI Bot* hai — ek *PREMIUM*, *MAST* aur *FUNNY* AI assistant.
+Tu {OWNER_NAME} ({OWNER_USERNAME}) ka bot hai.
 
 *TERI PERSONALITY:*
 • *Mast*, *funny*, thoda *attitude* wala lekin *RESPECTFUL*
@@ -50,7 +53,13 @@ PREMIUM_PREAMBLE = """Tu *GARAM GAND AI Bot* hai — ek *PREMIUM*, *MAST* aur *F
 • Emojis ke saath text aur mast lagna chahiye
 • Har reply *PREMIUM* aur *STYLISH* dikhna chahiye
 • Spacing aur formatting achi honi chahiye
-• Reply padhne mein *MAZA* aana chahiye"""
+• Reply padhne mein *MAZA* aana chahiye
+• Har reply ke end mein apne *OWNER* ka credit dena:
+
+━━━━━━━━━━━━━━━━━━━━━━
+👑 *Owner:* {OWNER_NAME}
+📩 {OWNER_USERNAME}
+━━━━━━━━━━━━━━━━━━━━━━"""
 
 def get_ist_now():
     return datetime.now(IST)
@@ -132,22 +141,19 @@ def get_premium_reply(user_input, chat_id):
         )
         return response.text
     except:
-        return "_😅 Thoda sa ruk ja bhai, fir se bol!_ 💎"
+        return f"_😅 Thoda sa ruk ja bhai, fir se bol!_ 💎\n\n━━━━━━━━━━━━━━━━━━━━━━\n👑 *Owner:* {OWNER_NAME}\n📩 {OWNER_USERNAME}\n━━━━━━━━━━━━━━━━━━━━━━"
 
 # ================== WELCOME NEW USERS ==================
 
 async def welcome_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """New user join hone par premium welcome"""
     chat_id = update.effective_chat.id
     chat_type = update.effective_chat.type
     
     if chat_type == ChatType.PRIVATE:
         return
     
-    # New members check
     if update.message.new_chat_members:
         for new_user in update.message.new_chat_members:
-            # Bot khud join kare to skip
             if new_user.id == context.bot.id:
                 continue
             
@@ -164,12 +170,14 @@ async def welcome_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💎 Yahaan aapko milega:\n"
                 f"   • *Premium AI Replies* 🔥\n"
                 f"   • *Mast Mazaak* 😂\n"
-                f"   • *Full Entertainment* ⚡\n\n"
+                f"   • *Full Entertainment* ⚡\n"
+                f"   • *Mute System* 🔇\n\n"
+                f"🤖 *Bot:* {BOT_USERNAME}\n"
+                f"👑 *Owner:* {OWNER_NAME}\n"
+                f"📩 {OWNER_USERNAME}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"📢 Kuch bhi puchho, bhejo —\n"
                 f"   *GARAM GAND AI* jawab dega! 💬\n\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"👑 *Owner:* {BOT_USERNAME}\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
                 f"🔰 _Group mein enjoy karo!_ 🤗"
             )
             
@@ -232,7 +240,8 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "`/mute 30d` (max)\n\n"
                 "📌 *Manual:*\n"
                 "`/mute user_id 10 minute`\n\n"
-                "🇮🇳 IST Time | ⏰ Auto Unmute",
+                "🇮🇳 IST Time | ⏰ Auto Unmute\n"
+                f"👑 *Owner:* {OWNER_USERNAME}",
                 parse_mode="Markdown"
             )
             return
@@ -312,11 +321,11 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"   📆 {until_ist.strftime('%d %B %Y')}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"⏰ Time khatam hone par *AUTO UNMUTE* hoga!\n"
-            f"🔊 Ya `/unmute` reply karke manual unmute",
+            f"🔊 Ya `/unmute` reply karke manual unmute\n\n"
+            f"👑 *Owner:* {OWNER_USERNAME}",
             parse_mode="Markdown"
         )
         
-        # Auto Unmute
         async def auto_unmute():
             await asyncio.sleep(mute_minutes * 60)
             try:
@@ -344,7 +353,8 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text=f"✅ *AUTO UNMUTED!* 🇮🇳\n\n"
                          f"👤 *{target_name}*\n"
                          f"⏱️ {format_time(mute_minutes)} ka mute khatam!\n"
-                         f"💬 _Ab message kar sakta hai!_ 🎉",
+                         f"💬 _Ab message kar sakta hai!_ 🎉\n\n"
+                         f"👑 *Owner:* {OWNER_USERNAME}",
                     parse_mode="Markdown"
                 )
             except:
@@ -420,7 +430,8 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ *UNMUTED!* 🇮🇳\n\n"
             f"👤 *User:* {target_name}\n"
             f"🔓 *At:* `{now_ist.strftime('%I:%M:%S %p, %d %B %Y')}`\n\n"
-            f"💬 _Ab message kar sakta hai!_ 🎉",
+            f"💬 _Ab message kar sakta hai!_ 🎉\n\n"
+            f"👑 *Owner:* {OWNER_USERNAME}",
             parse_mode="Markdown"
         )
         
@@ -441,7 +452,8 @@ async def mutelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📌 *UNMUTE:* `/unmute` reply\n"
         "📌 *Manual:* `/mute ID time`\n\n"
         "⏰ *Auto Unmute* ON\n"
-        "👑 Admin only | 🇮🇳 IST Time",
+        "👑 Admin only | 🇮🇳 IST Time\n\n"
+        f"👑 *Owner:* {OWNER_USERNAME}",
         parse_mode="Markdown"
     )
 
@@ -467,6 +479,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• ⏰ Auto Unmute\n"
             "• 💬 Premium AI Reply\n"
             "• 👋 New User Welcome\n\n"
+            f"👑 *Owner:* {OWNER_NAME}\n"
+            f"📩 {OWNER_USERNAME}\n\n"
             "_Activate karo, phir enjoy karo!_ 🔥",
             parse_mode="Markdown"
         )
@@ -478,7 +492,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "_Ye bot sirf *OWNER* ke liye hai!_ 👑\n\n"
             "💡 *Group mein add karo* —\n"
             "   wahan sabko premium reply milega!\n"
-            "   New users ka welcome bhi hoga! ✨",
+            "   New users ka welcome bhi hoga! ✨\n\n"
+            f"👑 *Owner:* {OWNER_NAME}\n"
+            f"📩 {OWNER_USERNAME}",
             parse_mode="Markdown"
         )
         return
@@ -495,12 +511,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ *Auto Unmute* ⏰\n"
         "✅ *New User Welcome* 👋\n"
         "✅ *All Media Support* 🖼️\n"
-        "✅ *Private Lock* 🔒\n\n"
+        "✅ *Private Lock* 🔒\n"
+        "✅ *Owner Credit in Replies* 📩\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
         "⚡ *COMMANDS:*\n"
         "/start | /clear | /activate\n"
         "/mute | /unmute | /mutelist\n\n"
-        "👑 *Owner:* {BOT_USERNAME}\n\n"
+        f"👑 *Owner:* {OWNER_NAME}\n"
+        f"📩 {OWNER_USERNAME}\n\n"
         "_Bolo boss, kya chahiye?_ 🔥",
         parse_mode="Markdown"
     )
@@ -531,6 +549,8 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 "📢 _Sab kuch bhejo —_\n"
                 "   _GARAM GAND jawab dega!_ 💎\n\n"
+                f"👑 *Owner:* {OWNER_NAME}\n"
+                f"📩 {OWNER_USERNAME}\n\n"
                 "❌ /deactivate — Band karo",
                 parse_mode="Markdown"
             )
@@ -576,7 +596,6 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # New user welcome
     if message.new_chat_members:
         await welcome_new_user(update, context)
-        # Agar bot khud add hua to welcome ke baad bhi reply mat karo
         for new_user in message.new_chat_members:
             if new_user.id == context.bot.id:
                 return
@@ -587,7 +606,9 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "_Private mein sirf *OWNER* use kar sakta hai!_ 👑\n\n"
             "💡 Mujhe *GROUP* mein add karo —\n"
             "   wahan *SABKO* premium reply milega!\n"
-            "   New users ka welcome bhi hoga! ✨",
+            "   New users ka welcome bhi hoga! ✨\n\n"
+            f"👑 *Owner:* {OWNER_NAME}\n"
+            f"📩 {OWNER_USERNAME}",
             parse_mode="Markdown"
         )
         return
@@ -661,6 +682,8 @@ def main():
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
     
     print("💎 GARAM GAND AI — PREMIUM STYLISH BOT")
+    print(f"👑 Owner: {OWNER_NAME} ({OWNER_USERNAME})")
+    print(f"🆔 Owner ID: {OWNER_USER_ID}")
     print("👋 New User Welcome | ⏰ Auto Unmute")
     print("🔇 Mute | 🔊 Unmute | 💬 Premium AI")
     app.run_polling()
