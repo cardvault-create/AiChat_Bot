@@ -1,4 +1,5 @@
 import os
+import asyncio
 import cohere
 import pytz
 from datetime import datetime, timedelta
@@ -12,7 +13,7 @@ COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 # ==========================================
 
 # ================== OWNER SETUP ==================
-OWNER_USER_ID = 7614459746  # 👈 APNI USER ID YAHAN DALO
+OWNER_USER_ID = 1234567890  # 👈 APNI USER ID YAHAN DALO
 # =================================================
 
 co = cohere.Client(COHERE_API_KEY)
@@ -54,7 +55,6 @@ def parse_time(time_str):
     if not time_str:
         return None
     
-    # Words ke saath
     if 'seconds' in time_str or time_str.endswith('second') or time_str.endswith('sec'):
         num = time_str.replace('seconds', '').replace('second', '').replace('sec', '')
         return float(num) / 60 if num else None
@@ -67,7 +67,6 @@ def parse_time(time_str):
     elif 'days' in time_str or time_str.endswith('day'):
         num = time_str.replace('days', '').replace('day', '')
         return float(num) * 1440 if num else None
-    # Short format
     elif time_str.endswith('s'):
         return float(time_str[:-1]) / 60
     elif time_str.endswith('m'):
@@ -129,7 +128,7 @@ def get_premium_reply(user_input, chat_id):
     except:
         return "😅 Thoda sa ruk ja bhai, fir se bol! 💎"
 
-# ================== MUTE ==================
+# ================== MUTE SYSTEM ==================
 
 async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -181,7 +180,8 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "`/mute 2h` `/mute 1d`\n"
                 "`/mute 30d` (max)\n\n"
                 "📌 **Manual:**\n"
-                "`/mute user_id 10 minute`"
+                "`/mute user_id 10 minute`\n\n"
+                "🇮🇳 IST Time | ⏰ Auto Unmute"
             )
             return
     
@@ -239,8 +239,9 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if target_user.last_name:
             target_name += f" {target_user.last_name}"
         admin_name = update.effective_user.first_name or "Admin"
+        reply_msg = update.message.reply_to_message.message_id if update.message.reply_to_message else None
         
-        await update.message.reply_text(
+        mute_msg = await update.message.reply_text(
             f"🔇 **MUTED! — INDIA TIME** 🇮🇳\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"👤 **User:** {target_name}\n"
@@ -255,8 +256,44 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"   🕐 `{until_ist.strftime('%I:%M:%S %p')}`\n"
             f"   📆 {until_ist.strftime('%d %B %Y')}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"🔊 `/unmute` reply karke manual unmute"
+            f"⏰ Time khatam hone par **AUTO UNMUTE** hoga!\n"
+            f"🔊 Ya `/unmute` reply karke manual unmute"
         )
+        
+        # 🔥 AUTO UNMUTE SCHEDULE
+        async def auto_unmute():
+            await asyncio.sleep(mute_minutes * 60)
+            try:
+                await context.bot.restrict_chat_member(
+                    chat_id=chat_id,
+                    user_id=target_user.id,
+                    permissions=ChatPermissions(
+                        can_send_messages=True,
+                        can_send_audios=True,
+                        can_send_documents=True,
+                        can_send_photos=True,
+                        can_send_videos=True,
+                        can_send_video_notes=True,
+                        can_send_voice_notes=True,
+                        can_send_polls=True,
+                        can_send_other_messages=True,
+                        can_add_web_page_previews=True,
+                        can_change_info=False,
+                        can_invite_users=False,
+                        can_pin_messages=False
+                    )
+                )
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"✅ **AUTO UNMUTED!** 🇮🇳\n\n"
+                         f"👤 {target_name}\n"
+                         f"⏱️ {format_time(mute_minutes)} ka mute khatam!\n"
+                         f"💬 Ab message kar sakta hai! 🎉"
+                )
+            except:
+                pass
+        
+        asyncio.create_task(auto_unmute())
         
     except Exception as e:
         await update.message.reply_text(f"❌ Mute fail! Permissions check karo.\n`{str(e)[:80]}`")
@@ -337,14 +374,17 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def mutelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🔇 **MUTE HELP** 🇮🇳\n\n"
-        "📌 **Mute (reply karke):**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "📌 **MUTE (reply karke):**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
         "`/mute 10 second` | `25s`\n"
         "`/mute 5 minute` | `5m`\n"
         "`/mute 2 hour` | `2h`\n"
         "`/mute 1 day` | `1d`\n"
         "`/mute 30d` (max)\n\n"
-        "📌 **Unmute:** `/unmute` reply\n"
+        "📌 **UNMUTE:** `/unmute` reply\n"
         "📌 **Manual:** `/mute ID time`\n\n"
+        "⏰ Auto Unmute ON\n"
         "👑 Admin only | 🇮🇳 IST Time"
     )
 
@@ -359,10 +399,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_history[chat_id] = []
         await update.message.reply_text(
             "👋 **GARAM GAND AI READY!** 💎\n\n"
-            "👑 Admin: /activate karo\n"
-            "🔇 /mute — Mute user\n"
-            "🔊 /unmute — Unmute\n"
-            "📋 /mutelist — Help\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "👑 **Admin Commands:**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "/activate — Bot ON\n"
+            "/mute — Mute user\n"
+            "/unmute — Unmute user\n"
+            "/mutelist — Mute help\n\n"
+            "⏰ Auto Unmute Enabled!\n"
             "💬 Activate ke baad sabko premium reply!"
         )
         return
@@ -374,10 +418,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_history[chat_id] = []
     await update.message.reply_text(
         "💎 **WELCOME BOSS!** 💎\n\n"
-        "✅ AI Replies\n"
-        "✅ Mute System 🇮🇳\n"
-        "✅ Sab Media\n"
-        "✅ Private Lock\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🔥 **SYSTEMS ACTIVE:**\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "✅ Premium AI Replies\n"
+        "✅ Mute System (IST) 🇮🇳\n"
+        "✅ Auto Unmute ⏰\n"
+        "✅ Seconds/Minutes/Hours/Days\n"
+        "✅ Private Lock 🔒\n"
+        "✅ Group Support 👥\n"
+        "✅ Sab Media Reply\n\n"
         "/start | /clear | /activate | /deactivate\n"
         "/mute | /unmute | /mutelist"
     )
@@ -396,7 +446,17 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if member.status in ['administrator', 'creator']:
             active_groups.add(chat_id)
             user_history[chat_id] = []
-            await update.message.reply_text("✅ **ACTIVATED!** 🔥 Sabko premium reply + mute system ON!")
+            await update.message.reply_text(
+                "✅ **GROUP ACTIVATED!** 🔥\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "📢 Sabko PREMIUM REPLY!\n"
+                "🔇 Mute + ⏰ Auto Unmute ON!\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "/mute 10 second | /mute 5 minute\n"
+                "/mute 2 hour | /mute 1 day\n"
+                "/unmute — Manual unmute\n\n"
+                "❌ /deactivate — Band karo"
+            )
         else:
             await update.message.reply_text("❌ Sirf ADMIN!")
     except:
@@ -415,7 +475,7 @@ async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         member = await context.bot.get_chat_member(chat_id, user_id)
         if member.status in ['administrator', 'creator']:
             active_groups.discard(chat_id)
-            await update.message.reply_text("🔴 Deactivated!")
+            await update.message.reply_text("🔴 Deactivated! /activate se on karo.")
     except:
         pass
 
@@ -439,7 +499,6 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_type != ChatType.PRIVATE and chat_id not in active_groups:
         return
     
-    # Message detect
     if message.text:
         user_input = message.text
     elif message.caption:
@@ -497,8 +556,8 @@ def main():
     app.add_handler(CommandHandler("mutelist", mutelist))
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
     
-    print("💎 GARAM GAND AI — ZERO ERROR BOT")
-    print("🇮🇳 IST | 🔇 Mute | 🔊 Unmute | 💬 AI")
+    print("💎 GARAM GAND AI — ULTIMATE BOT")
+    print("🇮🇳 IST | ⏰ Auto Unmute | 🔇 Mute | 🔊 Unmute | 💬 AI")
     app.run_polling()
 
 if __name__ == "__main__":
