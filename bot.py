@@ -9,7 +9,7 @@ from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.environ.get("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")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 # ==========================================
 
 # ================== OWNER SETUP ==================
