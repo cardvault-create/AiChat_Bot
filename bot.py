@@ -9,6 +9,7 @@ from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 # ==========================================
 
 # ================== OWNER SETUP ==================
@@ -60,66 +61,41 @@ def format_time(minutes):
     return ", ".join(parts) if parts else "0 seconds"
 
 def get_ai_reply(user_input, chat_id):
-    """Free ChatGPT API — no key needed!"""
+    """Groq API — Super Fast & Free"""
     if chat_id not in user_history: user_history[chat_id] = []
     
-    # Build conversation
-    messages = [
-        {"role": "system", "content": "You are GARAM GAND AI, a friendly helpful assistant. Reply in user's language. Give accurate answers. Use emojis. Be natural and helpful."}
-    ]
+    messages = [{"role":"system","content":"You are GARAM GAND AI, a premium friendly assistant. Reply in user's language. Give detailed accurate answers. Use emojis naturally. Be helpful and fun."}]
     
-    for msg in user_history[chat_id][-4:]:
+    for msg in user_history[chat_id][-6:]:
         role = "user" if msg["role"]=="user" else "assistant"
-        messages.append({"role": role, "content": msg["content"]})
+        messages.append({"role":role,"content":msg["content"]})
     
-    messages.append({"role": "user", "content": user_input})
+    messages.append({"role":"user","content":user_input})
     
-    # Try multiple free APIs
-    return try_chatgpt_free(messages) or try_duckduckgo(messages) or "😅 Sab AI busy hain! 2 sec mein fir try karo 🙏"
-
-def try_chatgpt_free(messages):
-    """Try free ChatGPT API"""
     try:
-        # Use free endpoint
         response = requests.post(
-            "https://chatgpt-api.shn.hk/v1/",
-            json={
-                "messages": messages,
-                "model": "gpt-3.5-turbo"
-            },
-            timeout=15
-        )
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("choices", [{}])[0].get("message", {}).get("content")
-        return None
-    except:
-        return None
-
-def try_duckduckgo(messages):
-    """Try DuckDuckGo AI chat"""
-    try:
-        # Get last user message
-        user_msg = messages[-1]["content"] if messages else ""
-        
-        response = requests.post(
-            "https://duckduckgo.com/duckchat/v1/chat",
+            "https://api.groq.com/openai/v1/chat/completions",
             headers={
-                "Content-Type": "application/json",
-                "x-vqd-accept": "1"
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
             },
             json={
-                "model": "gpt-3.5-turbo-0125",
-                "messages": messages
+                "model": "llama-3.3-70b-versatile",
+                "messages": messages,
+                "temperature": 0.8,
+                "max_tokens": 500
             },
-            timeout=15
+            timeout=20
         )
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("message", "")
-        return None
+        
+        data = response.json()
+        if "choices" in data:
+            return data["choices"][0]["message"]["content"]
+        else:
+            err = data.get("error",{}).get("message","Unknown")
+            return f"😅 Error: {err[:60]}"
     except:
-        return None
+        return "😅 Network issue! Fir se bol bhai!"
 
 def is_allowed(uid): return uid in allowed_users
 
@@ -127,9 +103,9 @@ def is_allowed(uid): return uid in allowed_users
 
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ Sirf BOSS!"); return
-    if not context.args: await update.message.reply_text("📝 /adduser user_id\n🆔 /id se ID pata karo"); return
+    if not context.args: await update.message.reply_text("📝 /adduser user_id"); return
     try: allowed_users.add(int(context.args[0])); await update.message.reply_text(f"✅ User {context.args[0]} added!")
-    except: await update.message.reply_text("❌ Valid ID do!")
+    except: await update.message.reply_text("❌ Valid ID!")
 
 async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ Sirf BOSS!"); return
@@ -138,28 +114,28 @@ async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
         rid = int(context.args[0])
         if rid == OWNER_USER_ID: await update.message.reply_text("😎 BOSS ko nahi!"); return
         allowed_users.discard(rid); await update.message.reply_text(f"✅ User {rid} removed!")
-    except: await update.message.reply_text("❌ Valid ID do!")
+    except: await update.message.reply_text("❌ Valid ID!")
 
 async def userlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ Sirf BOSS!"); return
     ul = "\n".join([f"• `{uid}` {'👑' if uid==OWNER_USER_ID else '✅'}" for uid in allowed_users])
-    await update.message.reply_text(f"👥 Allowed Users:\n\n{ul}\n\nTotal: {len(allowed_users)}")
+    await update.message.reply_text(f"👥 Users:\n\n{ul}\n\nTotal: {len(allowed_users)}")
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ Sirf BOSS!"); return
     if not context.args: await update.message.reply_text("📝 /broadcast message"); return
-    msg = "📢 Broadcast from BOSS 👑\n\n" + " ".join(context.args)
+    msg = "📢 BOSS Message 👑\n\n" + " ".join(context.args)
     s = 0
     for uid in allowed_users:
         try: await context.bot.send_message(uid, msg); s += 1
         except: pass
-    await update.message.reply_text(f"✅ {s}/{len(allowed_users)} users ko bheja!")
+    await update.message.reply_text(f"✅ {s}/{len(allowed_users)} users!")
 
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.reply_to_message:
         t = update.message.reply_to_message.from_user
         await update.message.reply_text(f"👤 {t.first_name}\n🆔 `{t.id}`")
-    else: await update.message.reply_text(f"🆔 Your ID: `{update.effective_user.id}`")
+    else: await update.message.reply_text(f"🆔 `{update.effective_user.id}`")
 
 # ================== WELCOME ==================
 
@@ -168,9 +144,9 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     for u in update.message.new_chat_members:
         if u.id == context.bot.id:
-            await context.bot.send_message(cid, text="🤖 GARAM GAND AI JOINED!\n\n👑 /activate karo\n📢 Premium Reply Milega!\n💻 Coding | 📚 Knowledge | 😂 Fun")
+            await context.bot.send_message(cid, text="🤖 GARAM GAND AI!\n\n👑 /activate | 💻 Coding | 📚 Knowledge | 😂 Fun")
         else:
-            await context.bot.send_message(cid, text=f"✨ Welcome {u.first_name}! 🎉\n💎 AI Replies | 🔇 Mute | ⚡ Fast")
+            await context.bot.send_message(cid, text=f"✨ Welcome {u.first_name}! 🎉\n💎 AI | 🔇 Mute | ⚡ Fast")
 
 # ================== MUTE ==================
 
@@ -209,9 +185,7 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"🔇 MUTED! 🇮🇳\n\n"
             f"👤 {tn}\n👑 {an}\n⏱️ {format_time(mm)}\n\n"
-            f"📅 {nw.strftime('%I:%M %p, %d %b')}\n"
-            f"🔓 {ut.strftime('%I:%M %p, %d %b')}\n\n"
-            f"⏰ Auto Unmute ON"
+            f"📅 {nw.strftime('%I:%M %p, %d %b')}\n🔓 {ut.strftime('%I:%M %p, %d %b')}\n\n⏰ Auto ON"
         )
         
         async def auto():
@@ -244,25 +218,23 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id; ct = update.effective_chat.type; uid = update.effective_user.id
-    
     if ct == ChatType.PRIVATE:
         if is_allowed(uid):
             user_history[cid] = []
             await update.message.reply_text(
-                "💎 GARAM GAND AI — FREE & PREMIUM!\n\n"
-                "✅ ChatGPT Level AI\n"
+                "💎 GARAM GAND AI — GROQ POWERED!\n\n"
+                "✅ GPT-4 Level AI\n"
                 "✅ 100% FREE\n"
-                "✅ No API Key\n"
+                "✅ Super Fast ⚡\n"
                 "✅ Coding 💻\n"
                 "✅ Knowledge 📚\n"
                 "✅ Fun 😂\n\n"
-                "👑 Owner Commands:\n"
-                "/adduser | /removeuser | /userlist\n"
-                "/broadcast | /id\n\n"
+                "👑 /adduser | /removeuser | /userlist\n"
+                "📢 /broadcast | 🆔 /id\n\n"
                 "Kuch bhi puchho! 🔥"
             )
-        else: await update.message.reply_text("🔒 Permission nahi hai!")
-    else: user_history[cid] = []; await update.message.reply_text("👋 Ready! Admin /activate karo")
+        else: await update.message.reply_text("🔒 Permission nahi!")
+    else: user_history[cid] = []; await update.message.reply_text("👋 Admin /activate karo!")
 
 async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
@@ -270,7 +242,7 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         admins = await context.bot.get_chat_administrators(cid)
         if update.effective_user.id not in [a.user.id for a in admins]:
-            await update.message.reply_text("❌ Admin only! Bot ko Admin banao phir /activate"); return
+            await update.message.reply_text("❌ Admin only! Bot ko Admin banao → /activate"); return
     except: await update.message.reply_text("❌ Bot ko Admin banao!"); return
     active_groups[cid] = True; await update.message.reply_text("✅ ACTIVATED! 🔥\n💻 Coding | 📚 Knowledge | 😂 Fun\n❌ /deactivate")
 
@@ -285,14 +257,11 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id; ct = update.effective_chat.type; msg = update.message; uid = update.effective_user.id
-    
     if msg.new_chat_members: await welcome(update, context); return
     if ct == ChatType.PRIVATE and not is_allowed(uid): await update.message.reply_text("🔒 Permission nahi!"); return
     if ct != ChatType.PRIVATE and cid not in active_groups: return
     if not msg.text: return
-    
     await context.bot.send_chat_action(chat_id=cid, action="typing")
-    
     try:
         reply = get_ai_reply(msg.text, cid)
         if cid not in user_history: user_history[cid] = []
@@ -317,8 +286,8 @@ def main():
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(MessageHandler(filters.ALL, handle))
-    print("💎 GARAM GAND AI — FREE & WORKING!")
-    print("✅ No API Key | 100% Free | Always Online")
+    print("💎 GARAM GAND AI — GROQ")
+    print("✅ 100% Working | Free | Fast")
     app.run_polling()
 
 if __name__ == "__main__": main()
