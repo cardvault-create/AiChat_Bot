@@ -6,17 +6,20 @@ from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")  # 👈 Naya variable
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 # ==========================================
 
-# DeepSeek API URL
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 
 user_history = {}
 active_groups = set()
 
 def get_ai_reply(user_input, history):
-    messages = [{"role": "system", "content": "Tu ek mast, funny aur helpful AI assistant hai. Thoda attitude wala, thoda funny. User ki language mein jawab de."}]
+    """DeepSeek API se jawab lekar aaye"""
+    messages = [{
+        "role": "system",
+        "content": "Tu ek mast, funny aur helpful AI assistant hai. Naam hai GARAM GAND AI Bot. Thoda attitude wala, thoda funny, lekin fully helpful. User ki language mein jawab de. Natural baat kar, robot mat lag."
+    }]
     
     for msg in history[-5:]:
         role = "user" if msg["role"] == "user" else "assistant"
@@ -31,7 +34,8 @@ def get_ai_reply(user_input, history):
     
     data = {
         "model": "deepseek-chat",
-        "messages": messages
+        "messages": messages,
+        "temperature": 0.9
     }
     
     response = requests.post(DEEPSEEK_URL, headers=headers, json=data)
@@ -44,9 +48,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Hello! Main GARAM GAND AI Bot hoon!\n\n"
         "🔥 Har ek cheez ka reply doonga!\n"
-        "📝 Text | 🖼️ Photo | 🎵 Voice | 🎬 Video | 🎯 Sticker\n\n"
-        "/start - Restart\n/clear - Memory clear\n"
-        "/activate - Group ON\n/deactivate - Group OFF"
+        "📝 Text | 🖼️ Photo | 🎵 Voice | 🎬 Video | 🎯 Sticker | 📄 Document\n\n"
+        "Commands:\n"
+        "/start - Restart bot\n"
+        "/clear - Memory clear\n"
+        "/activate - Group ON (admin only)\n"
+        "/deactivate - Group OFF (admin only)"
     )
 
 async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -55,7 +62,7 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     if chat_type == ChatType.PRIVATE:
-        await update.message.reply_text("⚡ Sirf GROUP mein chalta hai!")
+        await update.message.reply_text("⚡ Yeh command sirf GROUP mein chalta hai!")
         return
     
     try:
@@ -63,9 +70,9 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if member.status in ['administrator', 'creator']:
             active_groups.add(chat_id)
             user_history[chat_id] = []
-            await update.message.reply_text("✅ Bot ACTIVATED! Ab GROUP ke HAR message ka reply dunga!")
+            await update.message.reply_text("✅ Bot ACTIVATED! Ab main GROUP ke HAR message ka reply dunga!\n\nBand karne ke liye: /deactivate")
         else:
-            await update.message.reply_text("❌ Sirf GROUP ADMIN use kar sakta hai!")
+            await update.message.reply_text("❌ Sirf GROUP ADMIN yeh command use kar sakta hai!")
     except:
         await update.message.reply_text("❌ Pehle bot ko GROUP ADMIN banao!")
 
@@ -75,75 +82,87 @@ async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     if chat_type == ChatType.PRIVATE:
-        await update.message.reply_text("⚡ Sirf GROUP mein chalta hai!")
+        await update.message.reply_text("⚡ Yeh command sirf GROUP mein chalta hai!")
         return
     
     try:
         member = await context.bot.get_chat_member(chat_id, user_id)
         if member.status in ['administrator', 'creator']:
             active_groups.discard(chat_id)
-            await update.message.reply_text("🔴 Bot DEACTIVATED!")
+            if chat_id in user_history:
+                del user_history[chat_id]
+            await update.message.reply_text("🔴 Bot DEACTIVATED!\n\nWapas on karne ke liye: /activate")
+        else:
+            await update.message.reply_text("❌ Sirf GROUP ADMIN yeh command use kar sakta hai!")
     except:
         await update.message.reply_text("❌ Pehle bot ko GROUP ADMIN banao!")
 
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_history[chat_id] = []
-    await update.message.reply_text("✅ Memory clear!")
+    await update.message.reply_text("✅ Memory clear! Naye conversation start!")
 
 async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     chat_type = update.effective_chat.type
     message = update.message
     
+    # Group check - sirf activate groups mein reply
     if chat_type != ChatType.PRIVATE and chat_id not in active_groups:
         return
     
+    # ========== MESSAGE TYPE DETECT ==========
     if message.text:
         user_input = message.text
     elif message.caption:
-        user_input = f"[Media]: {message.caption}"
+        user_input = f"[Media with caption]: {message.caption}"
     elif message.photo:
-        user_input = "🖼️ [Photo]"
+        user_input = "🖼️ [Photo bheja gaya]"
     elif message.video:
-        user_input = "🎬 [Video]"
+        user_input = "🎬 [Video bheja gaya]"
     elif message.sticker:
         emoji = message.sticker.emoji or "❓"
-        user_input = f"🎯 [Sticker] {emoji}"
+        user_input = f"🎯 [Sticker bheja gaya] Emoji: {emoji}"
     elif message.voice:
-        user_input = "🎵 [Voice]"
+        user_input = "🎵 [Voice message bheja gaya]"
     elif message.audio:
-        user_input = "🎧 [Audio]"
+        user_input = f"🎧 [Audio bheja gaya]"
     elif message.document:
-        user_input = f"📄 [File] {message.document.file_name or ''}"
+        user_input = f"📄 [Document bheja gaya] {message.document.file_name or ''}"
     elif message.animation:
-        user_input = "🎞️ [GIF]"
+        user_input = "🎞️ [GIF bheja gaya]"
+    elif message.video_note:
+        user_input = "📹 [Video note bheja gaya]"
     elif message.location:
-        user_input = "📍 [Location]"
+        user_input = "📍 [Location bheja gaya]"
     elif message.contact:
-        user_input = "👤 [Contact]"
+        user_input = f"👤 [Contact bheja gaya]"
     elif message.poll:
-        user_input = f"📊 [Poll]"
+        user_input = f"📊 [Poll bheja gaya]"
     else:
-        user_input = "📨 [Message]"
+        user_input = "📨 [Kuch bheja gaya]"
 
+    # Typing indicator
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
     
     try:
         if chat_id not in user_history:
             user_history[chat_id] = []
         
+        # AI se jawab
         bot_reply = get_ai_reply(user_input, user_history[chat_id])
         
+        # History save
         user_history[chat_id].append({"role": "user", "content": user_input})
         user_history[chat_id].append({"role": "assistant", "content": bot_reply})
         user_history[chat_id] = user_history[chat_id][-20:]
         
+        # Jawab bhejo
         await message.reply_text(bot_reply)
         
     except Exception as e:
         print(f"Error: {e}")
-        await message.reply_text("😅 Fir se try karo!")
+        await message.reply_text("😅 Phir se try karo, thoda error aaya!")
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -156,6 +175,7 @@ def main():
     
     print("=" * 50)
     print("🔥 GARAM GAND AI Bot Started! (DeepSeek)")
+    print("📝 Har message ka reply dega!")
     print("=" * 50)
     
     app.run_polling()
