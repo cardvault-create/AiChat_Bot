@@ -4,22 +4,19 @@ from telegram import Update, ChatMember
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatType
 
-# ================== ENVIRONMENT VARIABLES ==================
-TELEGRAM_TOKEN = os.environ.get("8865931839:AAFQbF2U0NRWNJ-5pabVh4r8gKTq1aqtJYY")
-GEMINI_API_KEY = os.environ.get("AQ.Ab8RN6JWQxKV1BLYeKWorV5wMuPqcGEwlD3Z2eWaTKSmgoTPLw")
-
-# Check karo keys hain ya nahi
-if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
-    raise ValueError("❌ TELEGRAM_TOKEN aur GEMINI_API_KEY environment variables mein set karo!")
-# ===========================================================
+# ================== KEYS (Variables se lega) ==================
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# ==============================================================
 
 # Gemini setup
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-2.0-flash')
 
-# Har user/group ki conversation history
 user_history = {}
 active_groups = set()
+
+# ... baaki pura code same ...
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
