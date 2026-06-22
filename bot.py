@@ -4,8 +4,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.constants import ChatType
 
 # ================== APNI KEYS YAHAN DALO ==================
-TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
+TELEGRAM_TOKEN = "8865931839:AAHMaz381lylrdmeX2ESubiJj66SK386HEM"
+GEMINI_API_KEY = "AIzaSyBsaJoC_aC31nSZyNFbPs3HnktkIVQ6Yt0"
 # ==========================================================
 
 # Gemini setup
