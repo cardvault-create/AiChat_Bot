@@ -7,8 +7,10 @@ from telegram import Update, ChatPermissions
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatType
 
+# ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# ==========================================
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-2.0-flash')
@@ -91,6 +93,8 @@ Previous chat:
 
 def is_allowed(uid): return uid in allowed_users
 
+# ================== PERMISSION ==================
+
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!* 👑", parse_mode="Markdown"); return
     if not context.args: await update.message.reply_text("📝 `/adduser user_id`", parse_mode="Markdown"); return
@@ -115,14 +119,21 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!* 👑", parse_mode="Markdown"); return
     if not context.args: await update.message.reply_text("📝 `/broadcast message`", parse_mode="Markdown"); return
     msg = "📢 *BROADCAST* 👑\n\n" + " ".join(context.args)
-    sent = sum(1 for uid in allowed_users if not (lambda: (await context.bot.send_message(uid, msg, parse_mode="Markdown"), True)[1] if False else False))
-    await update.message.reply_text(f"✅ Sent!")
+    sent = 0
+    for uid in allowed_users:
+        try:
+            await context.bot.send_message(uid, msg, parse_mode="Markdown")
+            sent += 1
+        except: pass
+    await update.message.reply_text(f"✅ *Sent!* 📊 {sent}/{len(allowed_users)} users", parse_mode="Markdown")
 
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.reply_to_message:
         t = update.message.reply_to_message.from_user
         await update.message.reply_text(f"👤 {t.first_name}\n🆔 `{t.id}`", parse_mode="Markdown")
     else: await update.message.reply_text(f"🆔 `{update.effective_user.id}`", parse_mode="Markdown")
+
+# ================== WELCOME ==================
 
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.new_chat_members: return
@@ -132,6 +143,8 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(cid, "🤖 *GARAM GAND AI JOINED!* 💎\n\n👑 `/activate` karo\n📢 Premium reply milega!", parse_mode="Markdown")
         else:
             await context.bot.send_message(cid, f"✨ *Welcome {u.first_name}!* 🎉\n💎 Premium AI | 🔇 Mute | ⚡ Fast", parse_mode="Markdown")
+
+# ================== MUTE ==================
 
 async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
@@ -197,6 +210,8 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ *UNMUTED!* {target.first_name} 🎉", parse_mode="Markdown")
     except: pass
 
+# ================== COMMANDS ==================
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id; ct = update.effective_chat.type; uid = update.effective_user.id
     if ct == ChatType.PRIVATE:
@@ -228,6 +243,8 @@ async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_history[update.effective_chat.id] = []; await update.message.reply_text("✅ Clear!")
 
+# ================== HANDLER ==================
+
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id; ct = update.effective_chat.type; msg = update.message; uid = update.effective_user.id
     if msg.new_chat_members: await welcome(update, context); return
@@ -246,10 +263,19 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
-    for cmd, fn in [("start",start),("activate",activate),("deactivate",deactivate),("clear",clear),("mute",mute_user),("unmute",unmute_user),("adduser",adduser),("removeuser",removeuser),("userlist",userlist),("broadcast",broadcast),("id",get_id)]:
-        app.add_handler(CommandHandler(cmd,fn))
-    app.add_handler(CommandHandler("mutelist",lambda u,c: u.message.reply_text("🔇 `/mute 10s 5m 2h 1d`\n🔊 `/unmute` | ⏰ Auto")))
-    app.add_handler(MessageHandler(filters.ALL,handle))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("activate", activate))
+    app.add_handler(CommandHandler("deactivate", deactivate))
+    app.add_handler(CommandHandler("clear", clear))
+    app.add_handler(CommandHandler("mute", mute_user))
+    app.add_handler(CommandHandler("unmute", unmute_user))
+    app.add_handler(CommandHandler("mutelist", lambda u,c: u.message.reply_text("🔇 `/mute 10s 5m 2h 1d`\n🔊 `/unmute` | ⏰ Auto")))
+    app.add_handler(CommandHandler("adduser", adduser))
+    app.add_handler(CommandHandler("removeuser", removeuser))
+    app.add_handler(CommandHandler("userlist", userlist))
+    app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("id", get_id))
+    app.add_handler(MessageHandler(filters.ALL, handle))
     print("💎 GEMINI FREE BOT READY!"); app.run_polling()
 
 if __name__ == "__main__": main()
