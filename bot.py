@@ -10,8 +10,7 @@ COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 # ==========================================
 
 # ================== OWNER SETUP ==================
-# Apna Telegram User ID yahan dalo
-OWNER_USER_ID = 7614459746  # 👈 APNI USER ID YAHAN DALO
+OWNER_USER_ID = 1234567890  # 👈 APNI USER ID DALO
 # =================================================
 
 co = cohere.Client(COHERE_API_KEY)
@@ -19,17 +18,13 @@ co = cohere.Client(COHERE_API_KEY)
 user_history = {}
 active_groups = set()
 
-# Allowed users (Owner + jinko permission do)
-allowed_users = {OWNER_USER_ID}  # Sirf owner allowed by default
-
-PREMIUM_PREAMBLE = """Tu GARAM GAND AI Bot hai - ek PREMIUM AI assistant jo sirf apne OWNER ke liye kaam karta hai.
+PREMIUM_PREAMBLE = """Tu GARAM GAND AI Bot hai - ek PREMIUM AI assistant.
 
 TERI PERSONALITY:
 - Mast, funny, thoda attitude wala lekin respectful
 - Har sawal ka DETAILED aur ACCURATE jawab
 - Emojis use kar, baat entertaining rakh
-- Owner ki language mein jawab de
-- Owner ko "Boss" ya "Sir" bulake respect de
+- User ki language mein jawab de, natural baat kar
 - Joke sunane ko bole to REAL funny jokes de
 - Shayari bole to ORIGINAL shayari likh
 - Code maange to PROPER working code de
@@ -56,138 +51,42 @@ def get_premium_reply(user_input, chat_id):
         )
         return response.text
     except Exception as e:
-        return f"💎 Premium mode mein thoda delay! Fir se try karo..."
-
-def is_allowed(user_id):
-    """Check if user is allowed"""
-    return user_id in allowed_users
-
-async def check_permission(update: Update) -> bool:
-    """Check if user has permission to use bot"""
-    user_id = update.effective_user.id
-    
-    if not is_allowed(user_id):
-        # Unauthorized user
-        await update.message.reply_text(
-            "🔒 **ACCESS DENIED!** 🔒\n\n"
-            "❌ Sorry, yeh bot PRIVATE hai!\n"
-            "👑 Sirf OWNER hi use kar sakta hai.\n\n"
-            "💎 Agar tum owner ho to /verify karo."
-        )
-        return False
-    return True
+        return f"😅 Fir se try karo! {str(e)[:40]}"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
+    chat_type = update.effective_chat.type
     user_id = update.effective_user.id
     
-    if not is_allowed(user_id):
+    # Group mein koi bhi start kar sakta
+    if chat_type != ChatType.PRIVATE:
+        user_history[chat_id] = []
+        await update.message.reply_text("👋 Bot ready! Admin /activate kare phir sab reply milega!")
+        return
+    
+    # Private mein sirf owner
+    if user_id != OWNER_USER_ID:
         await update.message.reply_text(
             "🔒 **PRIVATE BOT** 🔒\n\n"
-            "Ye bot sirf owner ke liye hai!\n"
-            "Agar owner ho to /verify karo.\n\n"
-            "😎 - GARAM GAND AI"
+            "❌ Ye bot sirf OWNER ke liye hai!\n"
+            "👑 Private chat mein sirf owner use kar sakta hai.\n\n"
+            "💡 Group mein add karo — wahan sabko reply milega!"
         )
         return
     
     user_history[chat_id] = []
-    user = update.effective_user
     await update.message.reply_text(
-        f"💎 **WELCOME BACK BOSS!** 💎\n\n"
-        f"👑 Owner: **{user.first_name}**\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🔥 **PREMIUM FEATURES:**\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "✅ Detailed & Accurate Replies\n"
-        "✅ Every Message Type Support\n"
-        "✅ Memory Based Conversation\n"
-        "✅ Fun + Professional Mix\n"
-        "✅ 100% Private & Secure\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "📝 Text | 🖼️ Photo | 🎯 Sticker\n"
-        "🎵 Voice | 🎬 Video | 📄 Document\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "⚡ **OWNER COMMANDS:**\n"
-        "/start - Bot Restart\n"
-        "/clear - Memory Clear\n"
-        "/adduser [ID] - User Add Karo\n"
-        "/removeuser [ID] - User Remove\n"
-        "/users - Allowed Users List\n"
-        "/activate - Group ON\n"
-        "/deactivate - Group OFF\n\n"
-        "💬 Bolo boss, kya chahiye? 🔥"
+        "💎 **WELCOME BACK BOSS!** 💎\n\n"
+        "✅ Private: Sirf tum\n"
+        "✅ Group: Sabko reply\n\n"
+        "/start - Restart\n/clear - Memory\n"
+        "/activate - Group ON\n/deactivate - Group OFF"
     )
-
-async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Owner verify karne ke liye"""
-    user_id = update.effective_user.id
-    
-    if user_id == OWNER_USER_ID:
-        allowed_users.add(user_id)
-        await update.message.reply_text("✅ **Verified! Welcome back Boss!** 👑💎")
-    else:
-        await update.message.reply_text("❌ Tum owner nahi ho! Sirf owner /verify kar sakta hai!")
-
-async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """New user allow karo"""
-    user_id = update.effective_user.id
-    
-    if user_id != OWNER_USER_ID:
-        await update.message.reply_text("❌ Sirf OWNER yeh command use kar sakta hai! 👑")
-        return
-    
-    if not context.args:
-        await update.message.reply_text("⚠️ Usage: /adduser [user_id]\nExample: /adduser 123456789")
-        return
-    
-    try:
-        new_user_id = int(context.args[0])
-        allowed_users.add(new_user_id)
-        await update.message.reply_text(f"✅ User `{new_user_id}` added! Ab wo bot use kar sakta hai! 🎉")
-    except:
-        await update.message.reply_text("❌ Valid user ID do! Example: /adduser 123456789")
-
-async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User remove karo"""
-    user_id = update.effective_user.id
-    
-    if user_id != OWNER_USER_ID:
-        await update.message.reply_text("❌ Sirf OWNER yeh command use kar sakta hai! 👑")
-        return
-    
-    if not context.args:
-        await update.message.reply_text("⚠️ Usage: /removeuser [user_id]")
-        return
-    
-    try:
-        remove_id = int(context.args[0])
-        if remove_id == OWNER_USER_ID:
-            await update.message.reply_text("❌ Owner ko remove nahi kar sakte! 😎")
-            return
-        allowed_users.discard(remove_id)
-        await update.message.reply_text(f"✅ User `{remove_id}` removed!")
-    except:
-        await update.message.reply_text("❌ Valid user ID do!")
-
-async def users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Allowed users dikhao"""
-    user_id = update.effective_user.id
-    
-    if user_id != OWNER_USER_ID:
-        await update.message.reply_text("❌ Sirf OWNER yeh command use kar sakta hai! 👑")
-        return
-    
-    user_list = "\n".join([f"• `{uid}`" for uid in allowed_users])
-    await update.message.reply_text(f"👥 **ALLOWED USERS:**\n\n{user_list}\n\nTotal: {len(allowed_users)} users")
 
 async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     chat_type = update.effective_chat.type
     user_id = update.effective_user.id
-    
-    if user_id != OWNER_USER_ID:
-        await update.message.reply_text("❌ Sirf OWNER group activate kar sakta hai! 👑")
-        return
     
     if chat_type == ChatType.PRIVATE:
         await update.message.reply_text("⚡ Sirf GROUP mein chalta hai!")
@@ -199,39 +98,39 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
             active_groups.add(chat_id)
             user_history[chat_id] = []
             await update.message.reply_text(
-                "✅ **GROUP ACTIVATED BOSS!** 🔥\n\n"
-                "Ab main group mein reply dunga!\n"
-                "Lekin sirf allowed users ko hi! 🔒"
+                "✅ **GROUP ACTIVATED!** 🔥\n\n"
+                "📢 Ab GROUP mein KOI BHI kuch bheje —\n"
+                "   sabka PREMIUM REPLY milega!\n\n"
+                "❌ Band: /deactivate"
             )
         else:
-            await update.message.reply_text("❌ Pehle admin banao!")
+            await update.message.reply_text("❌ Sirf GROUP ADMIN yeh command use kar sakta hai!")
     except:
-        await update.message.reply_text("❌ Pehle admin banao!")
+        await update.message.reply_text("❌ Pehle bot ko GROUP ADMIN banao!")
 
 async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     chat_type = update.effective_chat.type
     user_id = update.effective_user.id
     
-    if user_id != OWNER_USER_ID:
-        await update.message.reply_text("❌ Sirf OWNER deactivate kar sakta hai! 👑")
-        return
-    
     if chat_type == ChatType.PRIVATE:
         await update.message.reply_text("⚡ Sirf GROUP mein chalta hai!")
         return
     
-    active_groups.discard(chat_id)
-    await update.message.reply_text("🔴 Group Deactivated!")
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        if member.status in ['administrator', 'creator']:
+            active_groups.discard(chat_id)
+            await update.message.reply_text("🔴 Group Deactivated!")
+        else:
+            await update.message.reply_text("❌ Sirf GROUP ADMIN!")
+    except:
+        await update.message.reply_text("❌ Pehle admin banao!")
 
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not is_allowed(user_id):
-        return
-    
     chat_id = update.effective_chat.id
     user_history[chat_id] = []
-    await update.message.reply_text("✅ Memory Clear Boss!")
+    await update.message.reply_text("✅ Memory Clear!")
 
 async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -239,16 +138,17 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     user_id = update.effective_user.id
     
-    # Permission check
-    if not is_allowed(user_id):
+    # ========== PERMISSION CHECK ==========
+    # Private chat → Sirf owner allowed
+    if chat_type == ChatType.PRIVATE and user_id != OWNER_USER_ID:
         await update.message.reply_text(
-            "🔒 **ACCESS DENIED!** 🔒\n\n"
-            "Ye bot PRIVATE hai — Sirf OWNER use kar sakta hai! 👑\n\n"
-            "Apna bot banana hai? Contact @EgoFather_Ai_Bot"
+            "🔒 **PRIVATE BOT** 🔒\n\n"
+            "Private chat mein sirf BOSS use kar sakta hai! 👑\n\n"
+            "💡 Mujhe GROUP mein add karo — wahan SABKO reply milega!"
         )
         return
     
-    # Group check
+    # Group chat → Activated hona chahiye
     if chat_type != ChatType.PRIVATE and chat_id not in active_groups:
         return
     
@@ -265,30 +165,31 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             user_input = f"[Media]: {message.caption}"
     elif message.photo:
-        user_input = "🖼️ Photo bheji hai boss!"
+        user_input = "🖼️ Photo bheji hai"
     elif message.video:
-        user_input = "🎬 Video bheja hai boss!"
+        user_input = "🎬 Video bheja hai"
     elif message.sticker:
         emoji = message.sticker.emoji or ""
-        user_input = f"🎯 Sticker bheja {emoji}"
+        user_input = f"🎯 Sticker {emoji}"
     elif message.voice:
-        user_input = "🎵 Voice message bheja hai boss!"
+        user_input = "🎵 Voice message"
     elif message.audio:
-        user_input = "🎧 Audio bheja hai boss!"
+        user_input = "🎧 Audio"
     elif message.document:
-        user_input = f"📄 Document bheja hai boss!"
+        doc_name = message.document.file_name or ""
+        user_input = f"📄 Document {doc_name}"
     elif message.animation:
-        user_input = "🎞️ GIF bheja hai boss!"
+        user_input = "🎞️ GIF"
     elif message.video_note:
-        user_input = "📹 Video note bheja hai boss!"
+        user_input = "📹 Video note"
     elif message.location:
-        user_input = "📍 Location bheji hai boss!"
+        user_input = "📍 Location"
     elif message.contact:
-        user_input = "👤 Contact bheja hai boss!"
+        user_input = "👤 Contact"
     elif message.poll:
-        user_input = "📊 Poll banaya hai boss!"
+        user_input = "📊 Poll"
     else:
-        user_input = "📨 Kuch bheja hai boss!"
+        user_input = "📨 Message"
 
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
     
@@ -305,27 +206,21 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         print(f"Error: {e}")
-        await message.reply_text("😅 Thoda error aaya boss, fir se try karo!")
+        await message.reply_text("😅 Fir se try karo!")
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     
-    # Owner commands
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("verify", verify))
-    app.add_handler(CommandHandler("adduser", adduser))
-    app.add_handler(CommandHandler("removeuser", removeuser))
-    app.add_handler(CommandHandler("users", users_list))
     app.add_handler(CommandHandler("activate", activate))
     app.add_handler(CommandHandler("deactivate", deactivate))
     app.add_handler(CommandHandler("clear", clear))
-    
-    # Message handler
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
     
     print("=" * 60)
-    print("🔒 GARAM GAND AI — OWNER ONLY MODE")
-    print(f"👑 Owner ID: {OWNER_USER_ID}")
+    print("🔒 GARAM GAND AI — HYBRID MODE")
+    print("👑 Private: Owner Only")
+    print("👥 Group: Everyone (Activated)")
     print("=" * 60)
     
     app.run_polling()
