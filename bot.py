@@ -1,6 +1,6 @@
 import os
 import asyncio
-import google.generativeai as genai
+import requests
 import pytz
 from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions
@@ -9,15 +9,11 @@ from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 # ==========================================
 
 # ================== OWNER SETUP ==================
 OWNER_USER_ID = 7614459746
 # =================================================
-
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-2.0-flash')
 
 IST = pytz.timezone('Asia/Kolkata')
 
@@ -80,33 +76,68 @@ def format_time(minutes):
         parts.append(f"{secs} second{'s' if secs!=1 else ''}")
     return ", ".join(parts) if parts else "0 seconds"
 
+def get_ai_via_blackbox(user_input, history):
+    """Blackbox AI - FREE, No Limit"""
+    try:
+        messages = [{"role": "system", "content": "You are GARAM GAND AI, a friendly helpful assistant. Reply in user's language. Use emojis. Be natural. Keep replies clear and simple."}]
+        
+        for msg in history[-4:]:
+            role = "user" if msg["role"] == "user" else "assistant"
+            messages.append({"role": role, "content": msg["content"]})
+        
+        messages.append({"role": "user", "content": user_input})
+        
+        response = requests.post(
+            "https://api.blackbox.ai/api/chat",
+            json={"messages": messages, "model": "deepseek-ai/DeepSeek-V3"},
+            timeout=20
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return None
+    except:
+        return None
+
+def get_ai_via_pollinations(user_input, history):
+    """Pollinations AI - FREE, No Limit"""
+    try:
+        context = "You are GARAM GAND AI, a friendly helpful assistant. Reply in user's language. Use emojis. Be natural.\n\n"
+        for msg in history[-4:]:
+            context += f"{msg['role']}: {msg['content']}\n"
+        context += f"user: {user_input}\nassistant:"
+        
+        response = requests.post(
+            "https://text.pollinations.ai/",
+            json={"messages": [{"role": "user", "content": context}]},
+            timeout=20
+        )
+        
+        if response.status_code == 200:
+            return response.text.strip()
+        return None
+    except:
+        return None
+
 def get_ai_reply(user_input, chat_id):
+    """Try multiple free AIs - no limits!"""
     if chat_id not in user_history:
         user_history[chat_id] = []
     
-    prompt = """You are GARAM GAND AI, a helpful, friendly and smart assistant.
-Reply in user's language (Hindi/English/Hinglish).
-Give accurate answers. Use emojis naturally.
-Be friendly like a best friend.
-For coding give working code.
-Keep it simple and clear.
-No markdown formatting.
-
-Previous chat:
-"""
-    for msg in user_history[chat_id][-4:]:
-        prompt += f"{msg['role']}: {msg['content']}\n"
+    history = user_history[chat_id]
     
-    prompt += f"user: {user_input}\nassistant:"
+    # Try Blackbox first (best quality)
+    reply = get_ai_via_blackbox(user_input, history)
+    if reply and len(reply) > 5:
+        return reply
     
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        err = str(e)
-        if "quota" in err.lower():
-            return "😴 Daily limit reached! Kal try karo."
-        return "😅 Fir se bol bhai!"
+    # Try Pollinations (backup)
+    reply = get_ai_via_pollinations(user_input, history)
+    if reply and len(reply) > 5:
+        return reply
+    
+    return "😅 Abhi sab AI busy hain! 2 second mein fir se try karo! 🙏"
 
 def is_user_allowed(user_id):
     return user_id in allowed_users
@@ -114,39 +145,32 @@ def is_user_allowed(user_id):
 # ================== PERMISSION ==================
 
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id != OWNER_USER_ID:
+    if update.effective_user.id != OWNER_USER_ID:
         await update.message.reply_text("❌ Sirf Owner!")
         return
-    
     if not context.args:
         await update.message.reply_text("Use: /adduser user_id")
         return
-    
     try:
-        new_user_id = int(context.args[0])
-        allowed_users.add(new_user_id)
-        await update.message.reply_text(f"✅ User {new_user_id} added!")
+        allowed_users.add(int(context.args[0]))
+        await update.message.reply_text(f"✅ User {context.args[0]} added!")
     except:
         await update.message.reply_text("❌ Valid ID do!")
 
 async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id != OWNER_USER_ID:
+    if update.effective_user.id != OWNER_USER_ID:
         await update.message.reply_text("❌ Sirf Owner!")
         return
-    
     if not context.args:
         await update.message.reply_text("Use: /removeuser user_id")
         return
-    
     try:
-        remove_id = int(context.args[0])
-        if remove_id == OWNER_USER_ID:
+        rid = int(context.args[0])
+        if rid == OWNER_USER_ID:
             await update.message.reply_text("❌ Owner ko nahi!")
             return
-        allowed_users.discard(remove_id)
-        await update.message.reply_text(f"✅ User {remove_id} removed!")
+        allowed_users.discard(rid)
+        await update.message.reply_text(f"✅ User {rid} removed!")
     except:
         await update.message.reply_text("❌ Valid ID do!")
 
@@ -154,30 +178,26 @@ async def userlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID:
         await update.message.reply_text("❌ Sirf Owner!")
         return
-    user_list = "\n".join([f"• {uid} {'(Owner)' if uid==OWNER_USER_ID else ''}" for uid in allowed_users])
-    await update.message.reply_text(f"👥 Allowed Users:\n\n{user_list}\n\nTotal: {len(allowed_users)}")
+    ul = "\n".join([f"• {uid} {'(Owner)' if uid==OWNER_USER_ID else ''}" for uid in allowed_users])
+    await update.message.reply_text(f"👥 Allowed Users:\n\n{ul}\n\nTotal: {len(allowed_users)}")
 
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.reply_to_message:
-        target = update.message.reply_to_message.from_user
-        await update.message.reply_text(f"👤 {target.first_name}\n🆔 ID: {target.id}")
+        t = update.message.reply_to_message.from_user
+        await update.message.reply_text(f"👤 {t.first_name}\n🆔 {t.id}")
     else:
         await update.message.reply_text(f"🆔 Your ID: {update.effective_user.id}")
 
 # ================== WELCOME ==================
 
 async def welcome_new_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.new_chat_members:
-        return
-    
+    if not update.message.new_chat_members: return
     chat_id = update.effective_chat.id
-    
     for new_user in update.message.new_chat_members:
         if new_user.id == context.bot.id:
-            await context.bot.send_message(chat_id=chat_id, text="🤖 GARAM GAND AI JOINED!\n\n👑 Admin /activate karo\n📢 Phir sabko reply milega!\n\n💻 Coding | 📚 Knowledge | 😂 Fun")
-            continue
-        
-        await context.bot.send_message(chat_id=chat_id, text=f"✨ Welcome {new_user.first_name}! 🎉\n💎 AI Replies | 🔇 Mute | ⚡ Fast")
+            await context.bot.send_message(chat_id=chat_id, text="🤖 GARAM GAND AI JOINED!\n\n👑 /activate karo\n📢 Unlimited AI Replies!\n💻 Coding | 📚 Knowledge | 😂 Fun")
+        else:
+            await context.bot.send_message(chat_id=chat_id, text=f"✨ Welcome {new_user.first_name}! 🎉\n💎 Unlimited AI | 🔇 Mute | ⚡ Fast")
 
 # ================== MUTE ==================
 
@@ -204,22 +224,18 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if update.message.reply_to_message:
         target_user = update.message.reply_to_message.from_user
-        if context.args:
-            time_str = " ".join(context.args)
+        if context.args: time_str = " ".join(context.args)
     elif context.args and len(context.args) >= 2:
         try:
-            target_id = int(context.args[0])
-            target_user = (await context.bot.get_chat_member(chat_id, target_id)).user
+            target_user = (await context.bot.get_chat_member(chat_id, int(context.args[0]))).user
             time_str = " ".join(context.args[1:])
         except:
-            await update.message.reply_text("❌ ID galat!")
             return
     else:
-        await update.message.reply_text("🔇 /mute 10s 5m 2h 1d 30d\nReply karke!\n🇮🇳 IST | ⏰ Auto")
+        await update.message.reply_text("🔇 /mute 10s 5m 2h 1d 30d\nReply karke! 🇮🇳 ⏰ Auto")
         return
     
     if not target_user or target_user.id == admin_id or target_user.is_bot: return
-    
     mute_minutes = parse_time(time_str)
     if not mute_minutes or mute_minutes > 43200 or mute_minutes <= 0: return
     
@@ -229,13 +245,7 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.restrict_chat_member(
             chat_id=chat_id, user_id=target_user.id,
-            permissions=ChatPermissions(
-                can_send_messages=False, can_send_audios=False, can_send_documents=False,
-                can_send_photos=False, can_send_videos=False, can_send_video_notes=False,
-                can_send_voice_notes=False, can_send_polls=False, can_send_other_messages=False,
-                can_add_web_page_previews=False, can_change_info=False,
-                can_invite_users=False, can_pin_messages=False
-            ),
+            permissions=ChatPermissions(can_send_messages=False, can_send_audios=False, can_send_documents=False, can_send_photos=False, can_send_videos=False, can_send_video_notes=False, can_send_voice_notes=False, can_send_polls=False, can_send_other_messages=False, can_add_web_page_previews=False, can_change_info=False, can_invite_users=False, can_pin_messages=False),
             until_date=until_ist
         )
         
@@ -243,61 +253,32 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if target_user.last_name: target_name += f" {target_user.last_name}"
         admin_name = update.effective_user.first_name or "Admin"
         
-        await update.message.reply_text(
-            f"🔇 MUTED! 🇮🇳\n\n"
-            f"👤 {target_name}\n👑 {admin_name}\n⏱️ {format_time(mute_minutes)}\n\n"
-            f"📅 {now_ist.strftime('%I:%M:%S %p, %d %b %Y')}\n"
-            f"🔓 {until_ist.strftime('%I:%M:%S %p, %d %b %Y')}\n\n⏰ Auto Unmute ON"
-        )
+        await update.message.reply_text(f"🔇 MUTED! 🇮🇳\n\n👤 {target_name}\n👑 {admin_name}\n⏱️ {format_time(mute_minutes)}\n\n📅 {now_ist.strftime('%I:%M %p, %d %b')}\n🔓 {until_ist.strftime('%I:%M %p, %d %b')}\n\n⏰ Auto Unmute ON")
         
         async def auto_unmute():
             await asyncio.sleep(mute_minutes * 60)
             try:
-                await context.bot.restrict_chat_member(
-                    chat_id=chat_id, user_id=target_user.id,
-                    permissions=ChatPermissions(
-                        can_send_messages=True, can_send_audios=True, can_send_documents=True,
-                        can_send_photos=True, can_send_videos=True, can_send_video_notes=True,
-                        can_send_voice_notes=True, can_send_polls=True, can_send_other_messages=True,
-                        can_add_web_page_previews=True, can_change_info=False,
-                        can_invite_users=False, can_pin_messages=False
-                    )
-                )
+                await context.bot.restrict_chat_member(chat_id=chat_id, user_id=target_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_audios=True, can_send_documents=True, can_send_photos=True, can_send_videos=True, can_send_video_notes=True, can_send_voice_notes=True, can_send_polls=True, can_send_other_messages=True, can_add_web_page_previews=True, can_change_info=False, can_invite_users=False, can_pin_messages=False))
                 await context.bot.send_message(chat_id=chat_id, text=f"✅ AUTO UNMUTED! {target_name} 🎉")
             except: pass
         
         asyncio.create_task(auto_unmute())
-    except:
-        pass
+    except: pass
 
 async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     if update.effective_chat.type == ChatType.PRIVATE: return
-    
     target_user = None
-    if update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
+    if update.message.reply_to_message: target_user = update.message.reply_to_message.from_user
     elif context.args:
-        try:
-            target_user = (await context.bot.get_chat_member(chat_id, int(context.args[0]))).user
+        try: target_user = (await context.bot.get_chat_member(chat_id, int(context.args[0]))).user
         except: return
     else:
         await update.message.reply_text("🔊 Reply karke /unmute")
         return
-    
     if not target_user: return
-    
     try:
-        await context.bot.restrict_chat_member(
-            chat_id=chat_id, user_id=target_user.id,
-            permissions=ChatPermissions(
-                can_send_messages=True, can_send_audios=True, can_send_documents=True,
-                can_send_photos=True, can_send_videos=True, can_send_video_notes=True,
-                can_send_voice_notes=True, can_send_polls=True, can_send_other_messages=True,
-                can_add_web_page_previews=True, can_change_info=False,
-                can_invite_users=False, can_pin_messages=False
-            )
-        )
+        await context.bot.restrict_chat_member(chat_id=chat_id, user_id=target_user.id, permissions=ChatPermissions(can_send_messages=True, can_send_audios=True, can_send_documents=True, can_send_photos=True, can_send_videos=True, can_send_video_notes=True, can_send_voice_notes=True, can_send_polls=True, can_send_other_messages=True, can_add_web_page_previews=True, can_change_info=False, can_invite_users=False, can_pin_messages=False))
         await update.message.reply_text(f"✅ UNMUTED! {target_user.first_name} 🎉")
     except: pass
 
@@ -311,7 +292,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_type == ChatType.PRIVATE:
         if is_user_allowed(user_id):
             user_history[chat_id] = []
-            await update.message.reply_text("💎 GARAM GAND AI — Gemini Powered!\n\n✅ Best Free AI\n✅ Coding 💻\n✅ Knowledge 📚\n✅ Fun 😂\n\nKuch bhi puchho! 🔥")
+            await update.message.reply_text("💎 GARAM GAND AI — UNLIMITED!\n\n✅ No Limits\n✅ Coding 💻\n✅ Knowledge 📚\n✅ Fun 😂\n\nKuch bhi puchho! 🔥")
         else:
             await update.message.reply_text("🔒 Permission nahi hai!")
     else:
@@ -319,21 +300,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("👋 Ready! Admin /activate karo")
 
 async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    if update.effective_chat.type == ChatType.PRIVATE:
-        await update.message.reply_text("⚡ Sirf group!")
-        return
-    
+    if update.effective_chat.type == ChatType.PRIVATE: return
     try:
-        admins = await context.bot.get_chat_administrators(chat_id)
+        admins = await context.bot.get_chat_administrators(update.effective_chat.id)
         if update.effective_user.id not in [a.user.id for a in admins]:
             await update.message.reply_text("❌ Admin only! Bot ko Admin banao phir /activate")
             return
     except:
         await update.message.reply_text("❌ Bot ko Admin banao!")
         return
-    
-    active_groups[chat_id] = True
+    active_groups[update.effective_chat.id] = True
     await update.message.reply_text("✅ Activated! 🔥\n💻 Coding | 📚 Knowledge | 😂 Fun\n❌ /deactivate")
 
 async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -361,7 +337,7 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔒 Permission nahi hai!")
         return
     
-    if chat_type != ChatType.PRIVATE and (chat_id not in active_groups or not active_groups[chat_id]):
+    if chat_type != ChatType.PRIVATE and chat_id not in active_groups:
         return
     
     if not message.text:
@@ -384,7 +360,6 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("activate", activate))
     app.add_handler(CommandHandler("deactivate", deactivate))
@@ -397,9 +372,7 @@ def main():
     app.add_handler(CommandHandler("userlist", userlist))
     app.add_handler(CommandHandler("id", get_id))
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
-    
-    print("💎 GARAM GAND AI — GEMINI FREE")
-    print(f"👑 Owner: {OWNER_USER_ID}")
+    print("💎 GARAM GAND AI — UNLIMITED MODE")
     app.run_polling()
 
 if __name__ == "__main__":
