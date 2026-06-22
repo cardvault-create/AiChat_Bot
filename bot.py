@@ -1,19 +1,40 @@
 import os
-import google.generativeai as genai
+import cohere
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 # ==========================================
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-2.0-flash')
+co = cohere.Client(COHERE_API_KEY)
 
 user_history = {}
 active_groups = set()
+
+def get_ai_reply(user_input, chat_id):
+    if chat_id not in user_history:
+        user_history[chat_id] = []
+    
+    history = user_history[chat_id]
+    
+    chat_history = []
+    for msg in history[-6:]:
+        role = "USER" if msg["role"] == "user" else "CHATBOT"
+        chat_history.append({"role": role, "message": msg["content"]})
+    
+    preamble = "Tu GARAM GAND AI Bot hai - mast, funny, thoda attitude wala AI. User ki language mein jawab de. Natural baat kar."
+    
+    response = co.chat(
+        message=user_input,
+        chat_history=chat_history,
+        preamble=preamble,
+        temperature=0.9
+    )
+    
+    return response.text
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -40,9 +61,9 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if member.status in ['administrator', 'creator']:
             active_groups.add(chat_id)
             user_history[chat_id] = []
-            await update.message.reply_text("✅ Bot ACTIVATED! HAR message ka reply dunga!\nBand karne: /deactivate")
+            await update.message.reply_text("✅ Bot ACTIVATED! HAR message ka reply dunga!")
         else:
-            await update.message.reply_text("❌ Sirf GROUP ADMIN use kar sakta hai!")
+            await update.message.reply_text("❌ Sirf GROUP ADMIN!")
     except:
         await update.message.reply_text("❌ Bot ko GROUP ADMIN banao!")
 
@@ -76,7 +97,6 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat_type != ChatType.PRIVATE and chat_id not in active_groups:
         return
     
-    # Message type detect
     if message.text:
         user_input = message.text
     elif message.caption:
@@ -87,36 +107,29 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_input = "🎬 Video bheja gaya"
     elif message.sticker:
         emoji = message.sticker.emoji or ""
-        user_input = f"🎯 Sticker bheja gaya {emoji}"
+        user_input = f"🎯 Sticker {emoji}"
     elif message.voice:
-        user_input = "🎵 Voice message bheja gaya"
+        user_input = "🎵 Voice message"
     elif message.audio:
-        user_input = "🎧 Audio bheja gaya"
+        user_input = "🎧 Audio"
     elif message.document:
-        user_input = f"📄 Document bheja gaya"
+        user_input = "📄 Document"
     elif message.animation:
-        user_input = "🎞️ GIF bheja gaya"
+        user_input = "🎞️ GIF"
     elif message.location:
-        user_input = "📍 Location bheja gaya"
+        user_input = "📍 Location"
     elif message.contact:
-        user_input = "👤 Contact bheja gaya"
+        user_input = "👤 Contact"
     else:
-        user_input = "📨 Kuch bheja gaya"
+        user_input = "📨 Message"
 
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
     
     try:
+        bot_reply = get_ai_reply(user_input, chat_id)
+        
         if chat_id not in user_history:
             user_history[chat_id] = []
-        
-        prompt = "Tu GARAM GAND AI Bot hai - mast, funny, thoda attitude wala. User ki language mein jawab de. Natural baat kar.\n\n"
-        for msg in user_history[chat_id][-6:]:
-            prompt += f"{msg['role']}: {msg['content']}\n"
-        prompt += f"user: {user_input}\nassistant:"
-        
-        response = model.generate_content(prompt)
-        bot_reply = response.text
-        
         user_history[chat_id].append({"role": "user", "content": user_input})
         user_history[chat_id].append({"role": "assistant", "content": bot_reply})
         user_history[chat_id] = user_history[chat_id][-20:]
@@ -124,14 +137,8 @@ async def handle_everything(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(bot_reply)
         
     except Exception as e:
-        err = str(e)
-        print(f"Error: {err}")
-        if "quota" in err.lower() or "rate" in err.lower():
-            await message.reply_text("😴 Daily limit reached! Kal try karo ya naya Google account se key banao.")
-        elif "api" in err.lower() or "key" in err.lower():
-            await message.reply_text("🔑 API Key invalid! Nayi key banao.")
-        else:
-            await message.reply_text(f"😅 {err[:80]}")
+        print(f"Error: {e}")
+        await message.reply_text(f"😅 {str(e)[:60]}")
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -142,7 +149,7 @@ def main():
     app.add_handler(CommandHandler("clear", clear))
     app.add_handler(MessageHandler(filters.ALL, handle_everything))
     
-    print("🔥 GARAM GAND AI Bot Started! (Gemini FREE)")
+    print("🔥 GARAM GAND AI Bot Started! (Cohere FREE)")
     app.run_polling()
 
 if __name__ == "__main__":
