@@ -10,7 +10,7 @@ COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 # ==========================================
 
 # ================== OWNER SETUP ==================
-OWNER_USER_ID = 1234567890  # 👈 APNI USER ID DALO
+OWNER_USER_ID = 7614459746  # 👈 APNI USER ID DALO
 # =================================================
 
 co = cohere.Client(COHERE_API_KEY)
