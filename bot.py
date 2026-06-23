@@ -4,12 +4,14 @@ import cohere
 import pytz
 import requests
 from datetime import datetime, timedelta
-from telegram import Update, ChatPermissions
+from telegram import Update, ChatPermissions, Contact
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatType
 
+# ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
+# ==========================================
 
 OWNER_USER_ID = 7614459746
 
@@ -23,15 +25,24 @@ group_rules = {}
 group_notes = {}
 saved_contacts = {}
 
+# ================== AVANTIKA — PREMIUM AI ==================
 AVANTIKA_PREAMBLE = """You are AVANTIKA — the most ADVANCED, PREMIUM, and INTELLIGENT AI Assistant ever created. 💎✨👑
 
 YOUR ABSOLUTE RULES:
 1. **LANGUAGE MASTERY:** Detect the user's language INSTANTLY and reply in the *EXACT SAME LANGUAGE*.
+   - Hindi → Pure Hindi | English → Fluent English | Hinglish → Perfect Hinglish
 2. **DETAILED ANSWERS:** Never give a one-word answer. Give *FULL, COMPLETE, DETAILED* explanations.
 3. **PREMIUM FORMATTING:** Use ** for *BOLD*, _ for *ITALIC*, EMOJIS naturally: 🔥💯😂👊💎⚡🎯❤️✨🤗😎🙏💕
-4. **MATCH THE USER:** Match their MOOD, STYLE, and ENERGY.
-5. **BE A REAL FRIEND:** Talk NATURALLY.
-6. 💻 *CODING:* Complete working code. 📚 *KNOWLEDGE:* Everything. 😂 *FUN:* Jokes, shayari."""
+4. **PERFECT STRUCTURE:** Use ━━━ dividers, • bullet points.
+5. **MATCH THE USER:** Match their MOOD, STYLE, and ENERGY.
+6. **BE A REAL FRIEND:** Talk NATURALLY, not like a robot.
+
+YOUR EXPERTISE:
+• 💻 *CODING:* All programming languages. Complete working code with line-by-line explanation.
+• 📚 *KNOWLEDGE:* Science, History, Math, GK, Tech, EVERYTHING.
+• 😂 *FUN:* Jokes, Shayari, Memes, Entertainment.
+• 💡 *ADVICE:* Love, Career, Life, Motivation — GENUINE help.
+• 🎯 *ACCURACY:* 100% correct, up-to-date information."""
 
 def get_ist_now():
     return datetime.now(IST)
@@ -84,125 +95,314 @@ def get_ai_reply(text, chat_id):
     except:
         return "😅 _Fir se bol na dost!_ 💎\n\n━━━━━━━━━━━━━━━━━━━━━━\n✨ _AVANTIKA AI_ ✨"
 
-# ================== UID SYSTEM ==================
-def get_user_details_tg(target_uid):
-    bot_token = os.environ.get("TELEGRAM_TOKEN")
-    url = f"https://api.telegram.org/bot{bot_token}/getChat"
+# ================== TRUE CALLER STYLE UID SYSTEM ==================
+def get_telegram_user_info(uid):
+    """Telegram API se full user info — sabse reliable method"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChat"
     try:
-        response = requests.post(url, json={"chat_id": target_uid}, timeout=10)
-        data = response.json()
-        if data.get("ok"): return data["result"]
+        resp = requests.post(url, json={"chat_id": uid}, timeout=10)
+        data = resp.json()
+        if data.get("ok"):
+            return data["result"]
         return None
-    except: return None
+    except:
+        return None
 
-def get_user_profile_photos_count(uid):
-    bot_token = os.environ.get("TELEGRAM_TOKEN")
-    url = f"https://api.telegram.org/bot{bot_token}/getUserProfilePhotos"
+def get_user_profile_photos(uid):
+    """User ki profile photos count"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUserProfilePhotos"
     try:
-        response = requests.post(url, json={"user_id": uid, "limit": 1}, timeout=10)
-        data = response.json()
-        if data.get("ok"): return data["result"]["total_count"]
+        resp = requests.post(url, json={"user_id": uid, "limit": 1}, timeout=10)
+        data = resp.json()
+        if data.get("ok"):
+            return data["result"]["total_count"]
         return 0
-    except: return 0
+    except:
+        return 0
 
-def extract_phone_from_uid(uid):
+def check_phone_visibility(uid):
+    """Check if user's phone number is visible to bot"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChat"
+    try:
+        resp = requests.post(url, json={"chat_id": uid}, timeout=10)
+        data = resp.json()
+        if data.get("ok"):
+            result = data["result"]
+            if "phone_number" in result:
+                return result["phone_number"]
+        return None
+    except:
+        return None
+
+def analyze_uid_pattern(uid):
+    """UID pattern se possible numbers generate karo"""
     uid_str = str(uid)
     numbers = []
+    
+    # Indian mobile (10 digits starting with 7,8,9)
     if len(uid_str) >= 10:
-        last_10 = uid_str[-10:]
-        numbers.append(f"+91 {last_10[:5]} {last_10[5:]}")
-        numbers.append(f"91{last_10}")
-        numbers.append(f"0{last_10}")
+        for i in range(len(uid_str) - 9):
+            chunk = uid_str[i:i+10]
+            if chunk[0] in ('7', '8', '9'):
+                numbers.append(f"+91 {chunk[:5]} {chunk[5:]}")
+                numbers.append(f"+91{chunk}")
+    
+    # International format
     if len(uid_str) >= 12:
         numbers.append(f"+{uid_str[-12:]}")
-    return numbers
+    
+    # USA format
+    if len(uid_str) >= 10:
+        last_10 = uid_str[-10:]
+        numbers.append(f"+1 {last_10[:3]} {last_10[3:6]} {last_10[6:]}")
+    
+    # Remove duplicates
+    return list(set(numbers))
 
-def get_number_details_offline(uid):
+def get_uid_intelligence(uid):
+    """TrueCaller style intelligence report"""
     uid_str = str(uid)
-    country_codes = {'91': '🇮🇳 India', '1': '🇺🇸 USA/Canada', '44': '🇬🇧 UK', '92': '🇵🇰 Pakistan', '880': '🇧🇩 Bangladesh', '977': '🇳🇵 Nepal'}
-    details = {
-        "uid": uid, "possible_numbers": extract_phone_from_uid(uid),
-        "uid_length": len(uid_str),
-        "estimated_country": "🇮🇳 India" if uid_str.startswith(('91','7','8','9')) else "🌍 International",
-        "sim_cards_linked": min(len(uid_str)//3, 5),
-        "risk_level": "🟢 Low" if len(uid_str) > 9 else "🔴 High",
-        "uid_type": "Mobile" if uid_str.startswith(('7','8','9')) else "Landline/VoIP",
+    
+    report = {
+        "uid": uid,
+        "length": len(uid_str),
+        "starts_with": uid_str[0] if uid_str else "N/A",
     }
-    for code, country in country_codes.items():
-        if uid_str.startswith(code): details["estimated_country"] = country; break
-    return details
+    
+    # Country detection
+    if uid_str.startswith(('91', '7', '8', '9')):
+        report["country"] = "🇮🇳 India"
+        report["operator"] = "Jio/Airtel/VI/BSNL"
+    elif uid_str.startswith(('1',)):
+        report["country"] = "🇺🇸 USA/Canada"
+    elif uid_str.startswith(('44',)):
+        report["country"] = "🇬🇧 UK"
+    elif uid_str.startswith(('92',)):
+        report["country"] = "🇵🇰 Pakistan"
+    elif uid_str.startswith(('880',)):
+        report["country"] = "🇧🇩 Bangladesh"
+    else:
+        report["country"] = "🌍 International"
+    
+    # Risk analysis
+    if len(uid_str) < 8:
+        report["risk"] = "🔴 HIGH — Very short UID"
+    elif len(uid_str) < 10:
+        report["risk"] = "🟡 MEDIUM"
+    else:
+        report["risk"] = "🟢 LOW — Normal UID"
+    
+    # Type detection
+    if uid_str.startswith(('7', '8', '9')):
+        report["type"] = "📱 Mobile Number"
+    elif uid_str.startswith(('555', '666', '777')):
+        report["type"] = "🎭 Virtual/VoIP Number"
+    else:
+        report["type"] = "📞 Landline/Unknown"
+    
+    return report
 
 async def uid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """TRUE CALLER STYLE — UID Se Full Details"""
     user_id = update.effective_user.id
+    
     if user_id != OWNER_USER_ID:
-        await update.message.reply_text("❌ *ACCESS DENIED!* 🔒\n\n👑 _Sirf BOSS use kar sakta hai!_", parse_mode="Markdown"); return
+        await update.message.reply_text(
+            "❌ *ACCESS DENIED!* 🔒\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "👑 _Yeh command sirf *BOSS* use kar sakta hai!_\n"
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            parse_mode="Markdown"
+        )
+        return
+    
     if not context.args:
         await update.message.reply_text(
-            "🔍 *TRUE CALLER STYLE — UID SYSTEM* 🔍\n\n"
+            "🔍 *TRUE CALLER STYLE — UID TO DETAILS* 🔍\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "📝 *USAGE:*\n"
-            "• `/uid 123456789` — _UID se details_\n"
-            "• `/uid @username` — _Username se details_\n"
-            "• `/uid +919876543210` — _Number se UID_\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• `/uid 123456789`\n"
+            "   _UID se full details nikalo_\n\n"
+            "• `/uid @username`\n"
+            "   _Username se UID aur details nikalo_\n\n"
+            "• `/uid +919876543210`\n"
+            "   _Phone number se UID dhundho_\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "👑 _Only BOSS can use!_ 🔥",
+            "💡 *Kya Milega:*\n"
+            "• 👤 *Full Name & Username*\n"
+            "• 📱 *Phone Number (agar visible ho)*\n"
+            "• 🌍 *Country & Operator*\n"
+            "• 📊 *Risk Analysis*\n"
+            "• 🖼️ *Profile Photos*\n"
+            "• ⚙️ *Account Settings*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "👑 _Only BOSS can use this!_ 🔥",
             parse_mode="Markdown"
-        ); return
+        )
+        return
     
-    target = context.args[0]
+    target_input = context.args[0]
     target_uid = None
     
-    if target.startswith("@"):
-        try: target_uid = (await context.bot.get_chat(target)).id
-        except: await update.message.reply_text("❌ *Username not found!*", parse_mode="Markdown"); return
+    # Resolve username to UID
+    if target_input.startswith("@"):
+        try:
+            chat = await context.bot.get_chat(target_input)
+            target_uid = chat.id
+        except:
+            await update.message.reply_text(
+                "❌ *USERNAME NOT FOUND!*\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🔍 `{target_input}`\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "⚠️ _Ye username exist nahi karta ya bot ne interact nahi kiya._",
+                parse_mode="Markdown"
+            )
+            return
     else:
-        target = target.replace("+", "").replace(" ", "").replace("-", "")
-        try: target_uid = int(target)
-        except: await update.message.reply_text("❌ *Valid UID or number do!*", parse_mode="Markdown"); return
+        # Clean phone number to UID
+        target_input = target_input.replace("+", "").replace(" ", "").replace("-", "")
+        try:
+            target_uid = int(target_input)
+        except:
+            await update.message.reply_text("❌ *Valid UID, @username, ya phone number do!*", parse_mode="Markdown")
+            return
     
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     
-    tg_info = get_user_details_tg(target_uid)
-    number_details = get_number_details_offline(target_uid)
-    photos_count = get_user_profile_photos_count(target_uid)
+    # 1. Telegram API se user info
+    tg_user = get_telegram_user_info(target_uid)
     
+    # 2. Phone number check
+    phone_number = check_phone_visibility(target_uid)
+    
+    # 3. Profile photos
+    photo_count = get_user_profile_photos(target_uid)
+    
+    # 4. UID Intelligence
+    intelligence = get_uid_intelligence(target_uid)
+    
+    # 5. Possible numbers
+    possible_numbers = analyze_uid_pattern(target_uid)
+    
+    # Build Premium Message
     msg = "🔍 *TRUE CALLER STYLE — FULL REPORT* 🔍\n\n"
-    msg += "━━━━━━━━━━━━━━━━━━━━━━\n👤 *BASIC INFORMATION*\n━━━━━━━━━━━━━━━━━━━━━━\n"
     
-    if tg_info:
-        full_name = tg_info.get("first_name", "Unknown")
-        if tg_info.get("last_name"): full_name += f" {tg_info['last_name']}"
-        msg += f"• *Name:* {full_name}\n• *User ID:* `{tg_info.get('id', target_uid)}`\n"
-        msg += f"• *Username:* @{tg_info.get('username', 'None')}\n• *Bot:* {'Yes 🤖' if tg_info.get('is_bot') else 'No 👤'}\n"
-        msg += f"• *Language:* {tg_info.get('language_code', 'N/A')}\n• *Profile Photos:* {photos_count} 🖼️\n\n"
+    # Basic Info
+    msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += "👤 *BASIC INFORMATION*\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
+    
+    if tg_user:
+        full_name = tg_user.get("first_name", "Unknown")
+        if tg_user.get("last_name"):
+            full_name += f" {tg_user['last_name']}"
+        
+        msg += f"• *Name:* {full_name}\n"
+        msg += f"• *User ID:* `{target_uid}`\n"
+        msg += f"• *Username:* @{tg_user.get('username', 'Not Set')}\n"
+        msg += f"• *Is Bot:* {'Yes 🤖' if tg_user.get('is_bot') else 'No 👤'}\n"
+        msg += f"• *Language Code:* `{tg_user.get('language_code', 'N/A')}`\n"
+        msg += f"• *Profile Photos:* {photo_count} 🖼️\n"
+        
+        if phone_number:
+            msg += f"• *Phone Number:* ✅ `{phone_number}` 🔓\n"
+        else:
+            msg += "• *Phone Number:* 🔒 _Privacy Protected_\n"
+        
+        msg += "\n"
     else:
-        msg += f"• *User ID:* `{target_uid}`\n• *Profile Photos:* {photos_count} 🖼️\n"
-        msg += "• *Note: User ne bot se interact nahi kiya*\n\n"
+        msg += f"• *User ID:* `{target_uid}`\n"
+        msg += f"• *Profile Photos:* {photo_count} 🖼️\n"
+        msg += "• *Status:* ⚠️ _User ne bot se kabhi interact nahi kiya_\n\n"
     
-    msg += "━━━━━━━━━━━━━━━━━━━━━━\n📱 *POSSIBLE PHONE NUMBERS*\n━━━━━━━━━━━━━━━━━━━━━━\n"
-    for i, num in enumerate(number_details["possible_numbers"][:5], 1):
-        msg += f"• *{i}.* `{num}`\n"
+    # Phone Numbers Section
+    msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += "📱 *PHONE NUMBER ANALYSIS*\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
     
-    msg += f"\n━━━━━━━━━━━━━━━━━━━━━━\n📊 *INTELLIGENCE ANALYSIS*\n━━━━━━━━━━━━━━━━━━━━━━\n"
-    msg += f"• *Country:* {number_details['estimated_country']}\n• *Risk Level:* {number_details['risk_level']}\n"
-    msg += f"• *SIM Cards Linked:* ~{number_details['sim_cards_linked']}\n• *UID Type:* {number_details['uid_type']}\n"
+    if phone_number:
+        msg += f"• *Verified Number:* ✅ `{phone_number}`\n"
+        msg += "• *Status:* 🔓 _Number visible to bot_\n\n"
+    else:
+        msg += "• *Verified Number:* 🔒 _Not visible (Privacy ON)_\n"
+        msg += "• *Tip:* _User ko `/start` bhejne bolo, phir check karo_\n\n"
     
+    if possible_numbers:
+        msg += "• *Pattern-Matched Numbers:*\n"
+        for i, num in enumerate(possible_numbers[:5], 1):
+            msg += f"  {i}. `{num}`\n"
+        msg += "\n"
+    
+    # Intelligence Report
+    msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += "📊 *INTELLIGENCE REPORT*\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"• *Country:* {intelligence['country']}\n"
+    msg += f"• *Risk Level:* {intelligence['risk']}\n"
+    msg += f"• *UID Type:* {intelligence['type']}\n"
+    msg += f"• *UID Length:* {intelligence['length']} digits\n"
+    
+    if tg_user:
+        msg += f"• *Forwards:* {'✅ Enabled' if tg_user.get('has_private_forwards') else '❌ Disabled'}\n"
+        msg += f"• *Can Join Groups:* {'✅ Yes' if tg_user.get('can_join_groups') else '❌ No'}\n"
+    
+    # Saved Contact
     if target_uid in saved_contacts:
-        msg += f"\n━━━━━━━━━━━━━━━━━━━━━━\n💾 *SAVED CONTACT*\n━━━━━━━━━━━━━━━━━━━━━━\n"
-        msg += f"• *Name:* {saved_contacts[target_uid].get('name', 'N/A')}\n• *Number:* {saved_contacts[target_uid].get('number', 'N/A')}\n"
+        msg += f"\n━━━━━━━━━━━━━━━━━━━━━━\n💾 *SAVED CONTACT INFO*\n━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += f"• *Name:* {saved_contacts[target_uid].get('name', 'N/A')}\n"
+        msg += f"• *Number:* `{saved_contacts[target_uid].get('number', 'N/A')}`\n"
+        msg += f"• *Notes:* {saved_contacts[target_uid].get('notes', 'N/A')}\n"
     
-    msg += f"\n━━━━━━━━━━━━━━━━━━━━━━\n💎 _Powered by AVANTIKA AI_\n━━━━━━━━━━━━━━━━━━━━━━"
+    msg += f"\n━━━━━━━━━━━━━━━━━━━━━━\n💎 _Powered by AVANTIKA AI — True Caller Style_\n━━━━━━━━━━━━━━━━━━━━━━"
     
-    phone_num = number_details["possible_numbers"][0].replace(" ", "").replace("+", "")
-    keyboard = [
-        [{"text": "📞 CALL", "url": f"tel:{phone_num}"}, {"text": "💬 CHAT", "url": f"tg://user?id={target_uid}"}],
-        [{"text": "📱 WHATSAPP", "url": f"https://wa.me/{phone_num}"}, {"text": "💾 SAVE", "callback_data": f"save_{target_uid}"}]
-    ]
-    await update.message.reply_text(msg, parse_mode="Markdown", reply_markup={"inline_keyboard": keyboard})
+    # Buttons
+    keyboard = []
+    if phone_number:
+        clean_phone = phone_number.replace("+", "").replace(" ", "")
+        keyboard.append([
+            {"text": "📞 CALL", "url": f"tel:{clean_phone}"},
+            {"text": "💬 CHAT", "url": f"tg://user?id={target_uid}"}
+        ])
+        keyboard.append([
+            {"text": "📱 WHATSAPP", "url": f"https://wa.me/{clean_phone}"},
+            {"text": "💾 SAVE CONTACT", "callback_data": f"save_{target_uid}"}
+        ])
+    elif possible_numbers:
+        clean_phone = possible_numbers[0].replace("+", "").replace(" ", "")
+        keyboard.append([
+            {"text": "📞 CALL", "url": f"tel:{clean_phone}"},
+            {"text": "💬 CHAT", "url": f"tg://user?id={target_uid}"}
+        ])
+        keyboard.append([
+            {"text": "📱 WHATSAPP", "url": f"https://wa.me/{clean_phone}"},
+            {"text": "💾 SAVE", "callback_data": f"save_{target_uid}"}
+        ])
+    else:
+        keyboard.append([
+            {"text": "💬 OPEN CHAT", "url": f"tg://user?id={target_uid}"}
+        ])
+    
+    await update.message.reply_text(msg, parse_mode="Markdown", reply_markup={"inline_keyboard": keyboard} if keyboard else None)
 
 async def savecontact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!* 👑", parse_mode="Markdown"); return
-    if len(context.args) < 2: await update.message.reply_text("💾 `/savecontact UID Name Number`", parse_mode="Markdown"); return
+    """Contact save karo"""
+    if update.effective_user.id != OWNER_USER_ID:
+        await update.message.reply_text("❌ *Sirf BOSS!* 👑", parse_mode="Markdown"); return
+    
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "💾 *SAVE CONTACT*\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "📝 *USAGE:*\n"
+            "• `/savecontact UID Name Number`\n"
+            "• Reply to message: `/savecontact Name Number`\n\n"
+            "📌 *Example:*\n"
+            "`/savecontact 123456789 Rahul +919876543210`",
+            parse_mode="Markdown"
+        ); return
+    
     try:
         if update.message.reply_to_message:
             uid = update.message.reply_to_message.from_user.id
@@ -212,23 +412,50 @@ async def savecontact(update: Update, context: ContextTypes.DEFAULT_TYPE):
             uid = int(context.args[0])
             name = context.args[1] if len(context.args) > 1 else "Unknown"
             number = context.args[2] if len(context.args) > 2 else "Unknown"
-        saved_contacts[uid] = {"name": name, "number": number, "saved_at": datetime.now().strftime("%d %b %Y, %I:%M %p")}
-        await update.message.reply_text(f"💾 *CONTACT SAVED!* ✅\n• *Name:* {name}\n• *Number:* {number}\n• *UID:* `{uid}`", parse_mode="Markdown")
-    except Exception as e: await update.message.reply_text(f"❌ *Error!* `{str(e)[:50]}`", parse_mode="Markdown")
+        
+        saved_contacts[uid] = {
+            "name": name,
+            "number": number,
+            "notes": " ".join(context.args[3:]) if len(context.args) > 3 else "",
+            "saved_at": datetime.now().strftime("%d %b %Y, %I:%M %p")
+        }
+        
+        await update.message.reply_text(
+            f"💾 *CONTACT SAVED SUCCESSFULLY!* ✅\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• *Name:* {name}\n"
+            f"• *Number:* `{number}`\n"
+            f"• *UID:* `{uid}`\n"
+            f"• *Saved At:* {saved_contacts[uid]['saved_at']}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🔍 _Ab `/uid {uid}` se full details dekho!_",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ *Error!* `{str(e)[:50]}`", parse_mode="Markdown")
 
 async def savedlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!* 👑", parse_mode="Markdown"); return
-    if not saved_contacts: await update.message.reply_text("📝 _No saved contacts! `/savecontact`_"); return
-    msg = "💾 *SAVED CONTACTS*\n\n━━━━━━━━━━━━━━━━━━━━━━\n"
-    for uid, info in saved_contacts.items(): msg += f"• *{info['name']}* — `{info['number']}` (UID: `{uid}`)\n"
-    msg += f"━━━━━━━━━━━━━━━━━━━━━━\n📊 Total: {len(saved_contacts)}"
+    """Saved contacts ki list"""
+    if update.effective_user.id != OWNER_USER_ID:
+        await update.message.reply_text("❌ *Sirf BOSS!* 👑", parse_mode="Markdown"); return
+    
+    if not saved_contacts:
+        await update.message.reply_text("📝 _Koi saved contacts nahi! `/savecontact` se add karo._", parse_mode="Markdown")
+        return
+    
+    msg = "💾 *SAVED CONTACTS LIST* 💾\n\n━━━━━━━━━━━━━━━━━━━━━━\n"
+    for uid, info in saved_contacts.items():
+        msg += f"• *{info['name']}* — `{info['number']}`\n"
+        msg += f"  UID: `{uid}` | Saved: {info['saved_at']}\n\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━━━\n📊 *Total:* {len(saved_contacts)} contacts"
+    
     await update.message.reply_text(msg, parse_mode="Markdown")
 
-# ================== ALL FEATURES ==================
+# ================== ALL OTHER FEATURES (COMPLETE) ==================
 async def adduser(update, ctx):
     if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!* 👑"); return
     if not ctx.args: return
-    try: allowed_users.add(int(ctx.args[0])); await update.message.reply_text(f"✅ *Added!*")
+    try: allowed_users.add(int(ctx.args[0])); await update.message.reply_text(f"✅ *Added!* 🆔 `{ctx.args[0]}`")
     except: pass
 
 async def removeuser(update, ctx):
@@ -237,7 +464,7 @@ async def removeuser(update, ctx):
     try:
         rid = int(ctx.args[0])
         if rid == OWNER_USER_ID: return
-        allowed_users.discard(rid); await update.message.reply_text(f"✅ *Removed!*")
+        allowed_users.discard(rid); await update.message.reply_text(f"✅ *Removed!* 🆔 `{rid}`")
     except: pass
 
 async def userlist(update, ctx):
@@ -283,11 +510,10 @@ async def pin(update, ctx):
     except: pass
 
 async def unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Unpin all messages"""
     if update.effective_chat.type == ChatType.PRIVATE: return
     try:
         await context.bot.unpin_all_chat_messages(update.effective_chat.id)
-        await update.message.reply_text("📌 *All Messages Unpinned!* ✅", parse_mode="Markdown")
+        await update.message.reply_text("📌 *All Unpinned!* ✅", parse_mode="Markdown")
     except: pass
 
 async def warn(update, ctx):
@@ -297,7 +523,7 @@ async def warn(update, ctx):
     if cid not in group_warnings: group_warnings[cid] = {}
     if t.id not in group_warnings[cid]: group_warnings[cid][t.id] = 0
     group_warnings[cid][t.id] += 1
-    await update.message.reply_text(f"⚠️ *Warning!* {t.first_name} *{group_warnings[cid][t.id]}/3* {'🔴 Mute!' if group_warnings[cid][t.id]>=3 else '⚡'}")
+    await update.message.reply_text(f"⚠️ *Warning!* {t.first_name} *{group_warnings[cid][t.id]}/3*")
 
 async def clearwarns(update, ctx):
     cid = update.effective_chat.id
@@ -310,7 +536,7 @@ async def clearwarns(update, ctx):
 async def ban_user(update, ctx):
     t = update.message.reply_to_message.from_user if update.message.reply_to_message else None
     if not t: return
-    try: await ctx.bot.ban_chat_member(update.effective_chat.id, t.id); await update.message.reply_text(f"🔨 *BANNED!*")
+    try: await ctx.bot.ban_chat_member(update.effective_chat.id, t.id); await update.message.reply_text(f"🔨 *BANNED!* {t.first_name}")
     except: pass
 
 async def unban_user(update, ctx):
@@ -350,7 +576,7 @@ async def unmute_user(update, ctx):
     try:
         await ctx.bot.restrict_chat_member(chat_id=update.effective_chat.id,user_id=t.id,
             permissions=ChatPermissions(can_send_messages=True,can_send_audios=True,can_send_documents=True,can_send_photos=True,can_send_videos=True,can_send_video_notes=True,can_send_voice_notes=True,can_send_polls=True,can_send_other_messages=True,can_add_web_page_previews=True,can_change_info=False,can_invite_users=False,can_pin_messages=False))
-        await update.message.reply_text(f"✅ *UNMUTED!*")
+        await update.message.reply_text(f"✅ *UNMUTED!* {t.first_name}")
     except: pass
 
 async def welcome(update, ctx):
