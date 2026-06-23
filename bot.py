@@ -9,7 +9,7 @@ from telegram.constants import ChatType
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY")
 # ==========================================
 
 OWNER_USER_ID = 7614459746
@@ -21,22 +21,20 @@ group_warnings = {}
 group_rules = {}
 group_notes = {}
 
-# ================== AVANTIKA — PERFECT AI ==================
-SYSTEM_PROMPT = """You are AVANTIKA AI — a perfect MULTI-LANGUAGE assistant.
+# ================== AVANTIKA — MISTRAL INTELLIGENCE ==================
+SYSTEM_PROMPT = """You are AVANTIKA AI powered by Mistral — Europe's most powerful AI.
 
-CRITICAL — DETECT AND MATCH LANGUAGE:
-- User writes in HINDI → Reply in HINDI
-- User writes in ENGLISH → Reply in ENGLISH
-- User writes in HINGLISH → Reply in HINGLISH
-- User writes in ANY language → Reply in THAT EXACT language
-- NEVER mix languages — use the SAME language as user
+CRITICAL LANGUAGE RULE:
+- DETECT user's language and REPLY IN THAT SAME LANGUAGE
+- Hindi → Hindi | English → English | Hinglish → Hinglish
+- ANY language → Reply in THAT language
+- This is your HIGHEST priority. NEVER break this rule.
 
 STYLE:
-• ** for BOLD on key words
-• _ for ITALIC on emphasis
+• ** for BOLD | _ for ITALIC
 • Emojis: 👑💎✨🔥💕😘⚡🎯💋🌟🤗
-• COMPLETE answers — never half
-• NATURAL like a best friend
+• COMPLETE detailed answers
+• NATURAL friendly tone
 • Match user's MOOD
 • Coding = full working code
 • Knowledge = accurate details"""
@@ -79,9 +77,9 @@ def get_reply(text, chat_id):
         messages.append({"role":role,"content":msg["content"]})
     messages.append({"role":"user","content":text})
     try:
-        r = requests.post("https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization":f"Bearer {GROQ_API_KEY}","Content-Type":"application/json"},
-            json={"model":"llama-3.3-70b-versatile","messages":messages,"temperature":0.95,"max_tokens":800},timeout=25)
+        r = requests.post("https://api.mistral.ai/v1/chat/completions",
+            headers={"Authorization":f"Bearer {MISTRAL_API_KEY}","Content-Type":"application/json"},
+            json={"model":"mistral-medium","messages":messages,"temperature":0.95,"max_tokens":800},timeout=25)
         data = r.json()
         if "choices" in data: return data["choices"][0]["message"]["content"]
         return "😅 " + str(data.get("error",{}).get("message","Error"))[:50]
@@ -218,17 +216,7 @@ async def mute_user(update, ctx):
         await ctx.bot.restrict_chat_member(chat_id=cid,user_id=t.id,
             permissions=ChatPermissions(can_send_messages=False,can_send_audios=False,can_send_documents=False,can_send_photos=False,can_send_videos=False,can_send_video_notes=False,can_send_voice_notes=False,can_send_polls=False,can_send_other_messages=False,can_add_web_page_previews=False,can_change_info=False,can_invite_users=False,can_pin_messages=False),until_date=ut)
         tn = t.first_name or "User"
-        await update.message.reply_text(
-            f"🔇 *MUTED!* 🇮🇳\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"👤 *{tn}*\n🆔 `{t.id}`\n"
-            f"⏱️ {format_time(mm)}\n"
-            f"📅 `{nw.strftime('%I:%M %p, %d %b')}`\n"
-            f"🔓 `{ut.strftime('%I:%M %p, %d %b')}`\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"⏰ *Auto* | 🔊 */unmute*",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text(f"🔇 *MUTED!* 🇮🇳\n\n👤 *{tn}*\n🆔 `{t.id}`\n⏱️ {format_time(mm)}\n📅 `{nw.strftime('%I:%M %p, %d %b')}`\n🔓 `{ut.strftime('%I:%M %p, %d %b')}`\n⏰ *Auto* | 🔊 */unmute*")
         async def auto():
             await asyncio.sleep(mm*60)
             try:
@@ -258,33 +246,9 @@ async def welcome(update, ctx):
     cid = update.effective_chat.id
     for u in update.message.new_chat_members:
         if u.id == ctx.bot.id:
-            await ctx.bot.send_message(cid,
-                "✨ *AVANTIKA AI JOINED!* ✨\n\n"
-                "━━━━━━━━━━━━━━━━━━━━━━\n"
-                "👑 _Admin_ */activate*\n"
-                "📢 *PREMIUM REPLIES* for all!\n"
-                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                "💻 Coding | 📚 Knowledge | 😂 Fun\n"
-                "🔇 Mute | 🔨 Ban | ⚠️ Warn | 📌 Pin\n\n"
-                "🔥 _Activate me!_",
-                parse_mode="Markdown"
-            )
+            await ctx.bot.send_message(cid, "✨ *AVANTIKA AI JOINED!* ✨\n\n━━━━━━━━━━━━━━━━━━━━━━\n👑 _Admin_ */activate*\n📢 *MISTRAL POWERED REPLIES!*\n━━━━━━━━━━━━━━━━━━━━━━\n\n💻 Coding | 📚 Knowledge | 😂 Fun\n🔇 Mute | 🔨 Ban | ⚠️ Warn | 📌 Pin\n\n🔥 _Activate me!_", parse_mode="Markdown")
         else:
-            await ctx.bot.send_message(cid,
-                f"✨ *WELCOME!* ✨\n\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"👤 *{u.first_name}*\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"🌟 _So happy you're here!_ 🎉\n\n"
-                f"💎 *You get:*\n"
-                f"• *Smart AI Replies* 🔥\n"
-                f"• *Coding Help* 💻\n"
-                f"• *Knowledge* 📚\n"
-                f"• *Fun & Games* 😂\n\n"
-                f"📢 _Just type — I answer instantly!_ 💬\n\n"
-                f"🔰 _Enjoy!_ 🤗",
-                parse_mode="Markdown"
-            )
+            await ctx.bot.send_message(cid, f"✨ *WELCOME!* ✨\n\n━━━━━━━━━━━━━━━━━━━━━━\n👤 *{u.first_name}*\n━━━━━━━━━━━━━━━━━━━━━━\n\n🌟 _So happy you're here!_ 🎉\n\n💎 *You get:*\n• *Smart AI Replies* 🔥\n• *Coding Help* 💻\n• *Knowledge* 📚\n• *Fun & Games* 😂\n\n📢 _Just type — I answer instantly!_ 💬\n\n🔰 _Enjoy!_ 🤗", parse_mode="Markdown")
 
 # ================== COMMANDS ==================
 async def start(update, ctx):
@@ -292,54 +256,28 @@ async def start(update, ctx):
     if ct == ChatType.PRIVATE:
         if uid == OWNER_USER_ID:
             user_history[cid] = []
-            await update.message.reply_text(
-                "👑 *WELCOME BACK BOSS!* 👑\n\n"
-                "━━━━━━━━━━━━━━━━━━━━━━\n"
-                "💎 *AVANTIKA AI — GROQ POWERED*\n"
-                "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                "✅ *Premium AI (All Languages)*\n"
-                "✅ *Coding Master* 💻\n"
-                "✅ *Knowledge* 📚\n"
-                "✅ *Mute | Ban | Warn* 🛡️\n"
-                "✅ *Notes | Pin | Rules* 📝\n"
-                "✅ *User Management* 👥\n"
-                "✅ *Broadcast* 📢\n"
-                "✅ *FREE + UNLIMITED!* 🚀\n\n"
-                "/start /clear /activate\n"
-                "/mute /unmute /ban /unban /warn\n"
-                "/setrules /rules /addnote /notes\n"
-                "/pin /unpin /info\n"
-                "/adduser /removeuser /userlist\n"
-                "/broadcast /id\n\n"
-                "_Bolo boss!_ 🔥",
-                parse_mode="Markdown"
-            )
+            await update.message.reply_text("👑 *WELCOME BACK BOSS!* 👑\n\n━━━━━━━━━━━━━━━━━━━━━━\n💎 *AVANTIKA AI — MISTRAL*\n━━━━━━━━━━━━━━━━━━━━━━\n\n✅ *Europe's #1 AI*\n✅ *All Languages* 🌍\n✅ *Coding Master* 💻\n✅ *Knowledge Bank* 📚\n✅ *Mute | Ban | Warn* 🛡️\n✅ *Notes | Pin | Rules* 📝\n\n/start /clear /activate\n/mute /unmute /ban /unban /warn\n/setrules /rules /addnote /notes\n/pin /unpin /info\n/adduser /removeuser /userlist\n/broadcast /id\n\n_Bolo boss!_ 🔥", parse_mode="Markdown")
         elif is_allowed(uid): user_history[cid] = []; await update.message.reply_text("✅ *Access Granted!*\n💬 _Ask anything!_")
         else: await update.message.reply_text("🔒 *Access Denied!*")
     else:
         user_history[cid] = []
-        await update.message.reply_text("👋 *AVANTIKA AI* 💎\n\n👑 _Admin_ */activate*\n🔇 */mute* | 🔨 */ban* | ⚠️ */warn*\n📜 */rules* | 📝 */notes* | 📌 */pin*\n\n_Activate and enjoy!_ 🔥", parse_mode="Markdown")
+        await update.message.reply_text("👋 *AVANTIKA AI — MISTRAL* 💎\n\n👑 _Admin_ */activate*\n🔇 */mute* | 🔨 */ban* | ⚠️ */warn*\n📜 */rules* | 📝 */notes* | 📌 */pin*\n\n_Activate and enjoy!_ 🔥", parse_mode="Markdown")
 
 async def activate(update, ctx):
     cid = update.effective_chat.id
     if update.effective_chat.type == ChatType.PRIVATE: return
-    if update.effective_user.id not in [a.user.id for a in await ctx.bot.get_chat_administrators(cid)]:
-        await update.message.reply_text("❌ *ADMIN ONLY!* 👑\n1️⃣ Make me Admin\n2️⃣ All Permissions ON\n3️⃣ /activate"); return
+    if update.effective_user.id not in [a.user.id for a in await ctx.bot.get_chat_administrators(cid)]: await update.message.reply_text("❌ *ADMIN ONLY!* 👑\n1️⃣ Make me Admin\n2️⃣ All Permissions ON\n3️⃣ /activate"); return
     active_groups[cid] = True; user_history[cid] = []
     await update.message.reply_text("✅ *ACTIVATED!* 🔥\n💬 AI | 🔇 Mute | 🔨 Ban | ⚠️ Warn | 📜 Rules | 📝 Notes | 📌 Pin | 👋 Welcome\n❌ /deactivate")
 
 async def deactivate(update, ctx):
     if update.effective_chat.type == ChatType.PRIVATE: return
-    active_groups[update.effective_chat.id] = False
-    await update.message.reply_text("🔴 *OFF!* /activate")
+    active_groups[update.effective_chat.id] = False; await update.message.reply_text("🔴 *OFF!* /activate")
 
 async def clear(update, ctx):
     cid = update.effective_chat.id
     if update.effective_user.id != OWNER_USER_ID: return
-    user_history[cid] = []
-    group_warnings.pop(cid, None)
-    group_rules.pop(cid, None)
-    group_notes.pop(cid, None)
+    user_history[cid] = []; group_warnings.pop(cid, None); group_rules.pop(cid, None); group_notes.pop(cid, None)
     await update.message.reply_text("✅ *COMPLETE RESET!* 🔄\n💭 Memory ✅\n⚠️ Warnings ✅\n📜 Rules ✅\n📝 Notes ✅\n🆕 _Fresh start!_ 💎")
 
 # ================== HANDLER ==================
@@ -365,6 +303,6 @@ def main():
         app.add_handler(CommandHandler(cmd,fn))
     app.add_handler(CommandHandler("mutelist",lambda u,c: u.message.reply_text("🔇 */mute 10s 5m 2h 1d 30d*\n🔊 */unmute* | 🔨 */ban* | ⚠️ */warn*")))
     app.add_handler(MessageHandler(filters.ALL,handle))
-    print("👑 AVANTIKA AI — PERFECT BOT READY!"); app.run_polling()
+    print("👑 AVANTIKA AI — MISTRAL READY!"); app.run_polling()
 
 if __name__ == "__main__": main()
