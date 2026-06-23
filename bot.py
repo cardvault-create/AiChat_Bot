@@ -1,18 +1,18 @@
 import os
 import asyncio
-import requests
+import cohere
 import pytz
 from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatType
 
-# ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-# ==========================================
+COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 
 OWNER_USER_ID = 7614459746
+
+co = cohere.Client(COHERE_API_KEY)
 IST = pytz.timezone('Asia/Kolkata')
 user_history = {}
 active_groups = {}
@@ -21,27 +21,10 @@ group_warnings = {}
 group_rules = {}
 group_notes = {}
 
-# ================== AVANTIKA — DEEPSEEK INTELLIGENCE ==================
-SYSTEM_PROMPT = """You are AVANTIKA AI powered by DeepSeek-V3 — one of the world's most powerful AI systems.
-
-CRITICAL LANGUAGE RULE:
-- DETECT the user's language and REPLY IN THAT EXACT SAME LANGUAGE
-- Hindi → Hindi | English → English | Hinglish → Hinglish
-- Tamil, Telugu, Marathi, Gujarati, Bengali, Punjabi, Urdu, ANY → Same language
-- NEVER mix languages — use the EXACT language the user types in
-- This is your MOST IMPORTANT instruction
-
-YOUR STYLE:
-• ** for BOLD important words
-• _ for ITALIC emphasis
-• Emojis naturally: 👑💎✨🔥💕😘⚡🎯💋🌟🤗
-• COMPLETE detailed answers — never short or half
-• NATURAL friendly tone — like a real best friend
-• Match user's MOOD and EMOTION
-• For CODING: give complete working code with full explanation
-• For KNOWLEDGE: give accurate, detailed, up-to-date information
-• For FUN: be entertaining, engaging, and genuinely funny
-• Every reply must feel PREMIUM and HIGH QUALITY"""
+SYSTEM_PROMPT = """You are AVANTIKA AI.
+CRITICAL: Detect user's language, reply in SAME language.
+Hindi→Hindi, English→English, Hinglish→Hinglish, ANY→Same.
+Complete detailed answers. **Bold**, _Italic_, emojis. Natural friendly tone."""
 
 def get_ist_now(): return datetime.now(IST)
 
@@ -73,111 +56,84 @@ def format_time(m):
 
 def is_allowed(uid): return uid in allowed_users
 
-def get_deepseek_reply(text, chat_id):
+def get_reply(text, chat_id):
     if chat_id not in user_history: user_history[chat_id] = []
-    messages = [{"role":"system","content":SYSTEM_PROMPT}]
+    prompt = f"{SYSTEM_PROMPT}\n\nPrevious chat:\n"
     for msg in user_history[chat_id][-4:]:
-        role = "user" if msg["role"]=="user" else "assistant"
-        messages.append({"role":role,"content":msg["content"]})
-    messages.append({"role":"user","content":text})
+        prompt += f"{msg['role']}: {msg['content']}\n"
+    prompt += f"user: {text}\nassistant:"
     try:
-        r = requests.post("https://api.deepseek.com/v1/chat/completions",
-            headers={"Authorization":f"Bearer {DEEPSEEK_API_KEY}","Content-Type":"application/json"},
-            json={"model":"deepseek-chat","messages":messages,"temperature":0.95,"max_tokens":800},timeout=25)
-        data = r.json()
-        if "choices" in data: return data["choices"][0]["message"]["content"]
-        err = data.get("error",{}).get("message","")
-        if "Insufficient" in err: return "💰 *Balance khatam!* Naya account banao free credits ke liye."
-        return "😅 " + err[:50]
-    except: return "😅 _Network issue! Fir se bol!_ 💎"
+        response = co.generate(
+            model='command-r-plus',
+            prompt=prompt,
+            max_tokens=800,
+            temperature=0.95
+        )
+        return response.generations[0].text
+    except:
+        return "😅 _Fir se bol bhai!_ 💎"
 
-# ================== OWNER ==================
+# ================== ALL FEATURES (Compact) ==================
 async def adduser(update, ctx):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!* 👑"); return
-    if not ctx.args: await update.message.reply_text("📝 */adduser user_id*"); return
-    try: allowed_users.add(int(ctx.args[0])); await update.message.reply_text(f"✅ *Added!* 🆔 `{ctx.args[0]}`")
-    except: await update.message.reply_text("❌ Valid ID!")
+    if update.effective_user.id != OWNER_USER_ID: return
+    if not ctx.args: return
+    try: allowed_users.add(int(ctx.args[0])); await update.message.reply_text("✅ Added!")
+    except: pass
 
 async def removeuser(update, ctx):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!*"); return
-    if not ctx.args: await update.message.reply_text("📝 */removeuser user_id*"); return
+    if update.effective_user.id != OWNER_USER_ID: return
+    if not ctx.args: return
     try:
         rid = int(ctx.args[0])
-        if rid == OWNER_USER_ID: await update.message.reply_text("😎 *BOSS ko nahi!*"); return
-        allowed_users.discard(rid); await update.message.reply_text(f"✅ *Removed!* 🆔 `{rid}`")
-    except: await update.message.reply_text("❌ Valid ID!")
+        if rid == OWNER_USER_ID: return
+        allowed_users.discard(rid); await update.message.reply_text("✅ Removed!")
+    except: pass
 
 async def userlist(update, ctx):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!*"); return
-    ul = "\n".join([f"• `{uid}` {'👑' if uid==OWNER_USER_ID else '✅'}" for uid in allowed_users])
-    await update.message.reply_text(f"👥 *Users:*\n\n{ul}\n\n📊 Total: {len(allowed_users)}")
+    if update.effective_user.id != OWNER_USER_ID: return
+    await update.message.reply_text(f"👥 Users: {len(allowed_users)}")
 
 async def broadcast(update, ctx):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!*"); return
-    if not ctx.args: await update.message.reply_text("📝 */broadcast msg*"); return
-    msg = "📢 *BOSS Message* 👑\n\n" + " ".join(ctx.args)
+    if update.effective_user.id != OWNER_USER_ID: return
+    if not ctx.args: return
     for uid in allowed_users:
-        try: await ctx.bot.send_message(uid, msg, parse_mode="Markdown")
+        try: await ctx.bot.send_message(uid, "📢 BOSS 👑\n\n" + " ".join(ctx.args))
         except: pass
-    await update.message.reply_text("✅ *Sent!*")
 
 async def get_id(update, ctx):
-    if update.message.reply_to_message: await update.message.reply_text(f"🆔 `{update.message.reply_to_message.from_user.id}`")
-    else: await update.message.reply_text(f"🆔 `{update.effective_user.id}`")
+    if update.message.reply_to_message: await update.message.reply_text(f"🆔 {update.message.reply_to_message.from_user.id}")
+    else: await update.message.reply_text(f"🆔 {update.effective_user.id}")
 
-# ================== GROUP ==================
 async def setrules(update, ctx):
-    if not ctx.args: await update.message.reply_text("📝 */setrules rules*"); return
+    if not ctx.args: return
     group_rules[update.effective_chat.id] = " ".join(ctx.args)
-    await update.message.reply_text("📜 *Rules Set!* ✅")
+    await update.message.reply_text("📜 Rules Set!")
 
 async def rules(update, ctx):
-    cid = update.effective_chat.id
-    if cid in group_rules: await update.message.reply_text(f"📜 *Rules:*\n\n{group_rules[cid]}")
-    else: await update.message.reply_text("📜 _No rules!_ */setrules*")
+    await update.message.reply_text(group_rules.get(update.effective_chat.id, "📜 No rules!"))
 
 async def addnote(update, ctx):
     cid = update.effective_chat.id
-    if not ctx.args: await update.message.reply_text("📝 */addnote note*"); return
+    if not ctx.args: return
     if cid not in group_notes: group_notes[cid] = []
     group_notes[cid].append(" ".join(ctx.args))
-    await update.message.reply_text(f"✅ *Note Added!* ({len(group_notes[cid])})")
+    await update.message.reply_text("✅ Note Added!")
 
 async def notes(update, ctx):
     cid = update.effective_chat.id
-    if cid in group_notes and group_notes[cid]: await update.message.reply_text("📝 *Notes:*\n\n" + "\n".join([f"• {n}" for n in group_notes[cid]]))
-    else: await update.message.reply_text("📝 _No notes!_")
+    if cid in group_notes and group_notes[cid]: await update.message.reply_text("📝 " + "\n".join([f"• {n}" for n in group_notes[cid]]))
+    else: await update.message.reply_text("📝 No notes!")
 
-async def clearnotes(update, ctx): group_notes[update.effective_chat.id] = []; await update.message.reply_text("✅ *Cleared!*")
+async def clearnotes(update, ctx): group_notes[update.effective_chat.id] = []; await update.message.reply_text("✅ Cleared!")
 
-async def pin(update, ctx):
-    if not update.message.reply_to_message: await update.message.reply_text("📌 _Reply to pin!_"); return
-    try: await update.message.reply_to_message.pin(); await update.message.reply_text("📌 *Pinned!*")
-    except: pass
-
-async def unpin(update, ctx):
-    try: await ctx.bot.unpin_all_chat_messages(update.effective_chat.id)
-    except: pass
-
-async def info(update, ctx):
-    if update.effective_chat.type == ChatType.PRIVATE: await update.message.reply_text(f"👤 {update.effective_user.first_name}\n🆔 {update.effective_user.id}")
-    else:
-        try:
-            c = await ctx.bot.get_chat(update.effective_chat.id)
-            await update.message.reply_text(f"👥 {c.title}\n🆔 {update.effective_chat.id}\n👥 {await c.get_member_count()} members")
-        except: pass
-
-# ================== MODERATION ==================
 async def warn(update, ctx):
     cid = update.effective_chat.id
-    if not update.message.reply_to_message: await update.message.reply_text("⚠️ _Reply to warn!_"); return
+    if not update.message.reply_to_message: return
     t = update.message.reply_to_message.from_user
-    if t.id == update.effective_user.id: return
     if cid not in group_warnings: group_warnings[cid] = {}
     if t.id not in group_warnings[cid]: group_warnings[cid][t.id] = 0
     group_warnings[cid][t.id] += 1
-    wc = group_warnings[cid][t.id]
-    await update.message.reply_text(f"⚠️ *Warning!* 👤 {t.first_name}\n📊 *{wc}/3* {'🔴 Mute!' if wc>=3 else '⚡'}")
+    await update.message.reply_text(f"⚠️ Warning! {t.first_name} {group_warnings[cid][t.id]}/3")
 
 async def clearwarns(update, ctx):
     cid = update.effective_chat.id
@@ -185,24 +141,19 @@ async def clearwarns(update, ctx):
         t = update.message.reply_to_message.from_user
         if cid in group_warnings and t.id in group_warnings[cid]: group_warnings[cid][t.id] = 0
     else: group_warnings[cid] = {}
-    await update.message.reply_text("✅ *Cleared!*")
+    await update.message.reply_text("✅ Cleared!")
 
 async def ban_user(update, ctx):
-    cid = update.effective_chat.id
     t = update.message.reply_to_message.from_user if update.message.reply_to_message else None
-    if not t and ctx.args:
-        try: t = (await ctx.bot.get_chat_member(cid,int(ctx.args[0]))).user
-        except: return
     if not t: return
-    try: await ctx.bot.ban_chat_member(cid, t.id); await update.message.reply_text(f"🔨 *BANNED!* {t.first_name}")
+    try: await ctx.bot.ban_chat_member(update.effective_chat.id, t.id); await update.message.reply_text("🔨 BANNED!")
     except: pass
 
 async def unban_user(update, ctx):
-    if not ctx.args: await update.message.reply_text("📝 */unban user_id*"); return
-    try: await ctx.bot.unban_chat_member(update.effective_chat.id, int(ctx.args[0])); await update.message.reply_text("✅ *UNBANNED!*")
+    if not ctx.args: return
+    try: await ctx.bot.unban_chat_member(update.effective_chat.id, int(ctx.args[0])); await update.message.reply_text("✅ UNBANNED!")
     except: pass
 
-# ================== MUTE ==================
 async def mute_user(update, ctx):
     cid = update.effective_chat.id
     if update.effective_chat.type == ChatType.PRIVATE: return
@@ -213,7 +164,7 @@ async def mute_user(update, ctx):
     elif ctx.args and len(ctx.args)>=2:
         try: t = (await ctx.bot.get_chat_member(cid,int(ctx.args[0]))).user; ts = " ".join(ctx.args[1:])
         except: return
-    else: await update.message.reply_text("🔇 */mute 10s 5m 2h 1d 30d*\n_Reply!_ 🇮🇳 ⏰ Auto"); return
+    else: return
     if not t or t.id==update.effective_user.id or t.is_bot: return
     mm = parse_time(ts)
     if not mm or mm>43200 or mm<=0: return
@@ -221,94 +172,82 @@ async def mute_user(update, ctx):
     try:
         await ctx.bot.restrict_chat_member(chat_id=cid,user_id=t.id,
             permissions=ChatPermissions(can_send_messages=False,can_send_audios=False,can_send_documents=False,can_send_photos=False,can_send_videos=False,can_send_video_notes=False,can_send_voice_notes=False,can_send_polls=False,can_send_other_messages=False,can_add_web_page_previews=False,can_change_info=False,can_invite_users=False,can_pin_messages=False),until_date=ut)
-        tn = t.first_name or "User"
-        await update.message.reply_text(f"🔇 *MUTED!* 🇮🇳\n\n👤 *{tn}*\n🆔 `{t.id}`\n⏱️ {format_time(mm)}\n📅 `{nw.strftime('%I:%M %p, %d %b')}`\n🔓 `{ut.strftime('%I:%M %p, %d %b')}`\n⏰ *Auto* | 🔊 */unmute*")
+        await update.message.reply_text(f"🔇 MUTED! 👤 {t.first_name}\n⏱️ {format_time(mm)}\n🔓 {ut.strftime('%I:%M %p')}")
         async def auto():
             await asyncio.sleep(mm*60)
             try:
                 await ctx.bot.restrict_chat_member(chat_id=cid,user_id=t.id,
                     permissions=ChatPermissions(can_send_messages=True,can_send_audios=True,can_send_documents=True,can_send_photos=True,can_send_videos=True,can_send_video_notes=True,can_send_voice_notes=True,can_send_polls=True,can_send_other_messages=True,can_add_web_page_previews=True,can_change_info=False,can_invite_users=False,can_pin_messages=False))
-                await ctx.bot.send_message(cid, f"✅ *AUTO UNMUTED!* {tn} 💬")
+                await ctx.bot.send_message(cid, f"✅ AUTO UNMUTED! {t.first_name}")
             except: pass
         asyncio.create_task(auto())
     except: pass
 
 async def unmute_user(update, ctx):
-    cid = update.effective_chat.id
     t = update.message.reply_to_message.from_user if update.message.reply_to_message else None
-    if not t and ctx.args:
-        try: t = (await ctx.bot.get_chat_member(cid,int(ctx.args[0]))).user
-        except: return
-    if not t: await update.message.reply_text("🔊 _Reply /unmute_"); return
+    if not t: return
     try:
-        await ctx.bot.restrict_chat_member(chat_id=cid,user_id=t.id,
+        await ctx.bot.restrict_chat_member(chat_id=update.effective_chat.id,user_id=t.id,
             permissions=ChatPermissions(can_send_messages=True,can_send_audios=True,can_send_documents=True,can_send_photos=True,can_send_videos=True,can_send_video_notes=True,can_send_voice_notes=True,can_send_polls=True,can_send_other_messages=True,can_add_web_page_previews=True,can_change_info=False,can_invite_users=False,can_pin_messages=False))
-        await update.message.reply_text(f"✅ *UNMUTED!* {t.first_name} 💬")
+        await update.message.reply_text(f"✅ UNMUTED!")
     except: pass
 
-# ================== WELCOME ==================
 async def welcome(update, ctx):
     if not update.message.new_chat_members: return
-    cid = update.effective_chat.id
     for u in update.message.new_chat_members:
-        if u.id == ctx.bot.id:
-            await ctx.bot.send_message(cid, "✨ *AVANTIKA AI JOINED!* ✨\n\n━━━━━━━━━━━━━━━━━━━━━━\n👑 _Admin_ */activate*\n📢 *DEEPSEEK POWERED!*\n━━━━━━━━━━━━━━━━━━━━━━\n\n💻 Coding | 📚 Knowledge | 😂 Fun\n🔇 Mute | 🔨 Ban | ⚠️ Warn | 📌 Pin\n\n🔥 _Activate me!_", parse_mode="Markdown")
-        else:
-            await ctx.bot.send_message(cid, f"✨ *WELCOME!* ✨\n\n━━━━━━━━━━━━━━━━━━━━━━\n👤 *{u.first_name}*\n━━━━━━━━━━━━━━━━━━━━━━\n\n🌟 _So happy you're here!_ 🎉\n\n💎 *You get:*\n• *Smart AI Replies* 🔥\n• *Coding Help* 💻\n• *Knowledge* 📚\n• *Fun & Games* 😂\n\n📢 _Just type — I answer instantly!_ 💬\n\n🔰 _Enjoy!_ 🤗", parse_mode="Markdown")
+        if u.id == ctx.bot.id: await ctx.bot.send_message(update.effective_chat.id, "✨ AVANTIKA AI JOINED! ✨\n👑 /activate | 💻 Coding | 📚 Knowledge | 😂 Fun")
+        else: await ctx.bot.send_message(update.effective_chat.id, f"✨ WELCOME! ✨\n👤 {u.first_name}\n🌟 Happy you're here! 🎉")
 
-# ================== COMMANDS ==================
 async def start(update, ctx):
     cid = update.effective_chat.id; ct = update.effective_chat.type; uid = update.effective_user.id
     if ct == ChatType.PRIVATE:
         if uid == OWNER_USER_ID:
             user_history[cid] = []
-            await update.message.reply_text("👑 *WELCOME BACK BOSS!* 👑\n\n━━━━━━━━━━━━━━━━━━━━━━\n💎 *AVANTIKA AI — DEEPSEEK V3*\n━━━━━━━━━━━━━━━━━━━━━━\n\n✅ *World's #2 Most Powerful AI*\n✅ *All Languages Perfect* 🌍\n✅ *Coding Master* 💻\n✅ *Knowledge Bank* 📚\n✅ *Mute | Ban | Warn* 🛡️\n✅ *Notes | Pin | Rules* 📝\n\n/start /clear /activate\n/mute /unmute /ban /unban /warn\n/setrules /rules /addnote /notes\n/pin /unpin /info\n/adduser /removeuser /userlist\n/broadcast /id\n\n_Bolo boss!_ 🔥", parse_mode="Markdown")
-        elif is_allowed(uid): user_history[cid] = []; await update.message.reply_text("✅ *Access Granted!*\n💬 _Ask anything!_")
-        else: await update.message.reply_text("🔒 *Access Denied!*")
+            await update.message.reply_text("👑 WELCOME BACK BOSS! 👑\n\n💎 AVANTIKA AI — COHERE\n✅ All Languages\n✅ Coding | Knowledge | Fun\n\n/start /clear /activate\n/mute /unmute /ban /unban /warn\n/setrules /rules /addnote /notes\n/pin /unpin /info\n/adduser /removeuser /userlist\n/broadcast /id\n\n_Bolo boss!_ 🔥")
+        elif is_allowed(uid): user_history[cid] = []; await update.message.reply_text("✅ Access Granted! 💬")
+        else: await update.message.reply_text("🔒 Access Denied!")
     else:
         user_history[cid] = []
-        await update.message.reply_text("👋 *AVANTIKA AI — DEEPSEEK* 💎\n\n👑 _Admin_ */activate*\n🔇 */mute* | 🔨 */ban* | ⚠️ */warn*\n📜 */rules* | 📝 */notes* | 📌 */pin*\n\n_Activate and enjoy!_ 🔥", parse_mode="Markdown")
+        await update.message.reply_text("👋 AVANTIKA AI 💎\n👑 Admin /activate\n🔇 /mute | 🔨 /ban | ⚠️ /warn")
 
 async def activate(update, ctx):
     cid = update.effective_chat.id
     if update.effective_chat.type == ChatType.PRIVATE: return
-    if update.effective_user.id not in [a.user.id for a in await ctx.bot.get_chat_administrators(cid)]: await update.message.reply_text("❌ *ADMIN ONLY!* 👑\n1️⃣ Make me Admin\n2️⃣ All Permissions ON\n3️⃣ /activate"); return
+    if update.effective_user.id not in [a.user.id for a in await ctx.bot.get_chat_administrators(cid)]: await update.message.reply_text("❌ ADMIN ONLY!"); return
     active_groups[cid] = True; user_history[cid] = []
-    await update.message.reply_text("✅ *ACTIVATED!* 🔥\n💬 AI | 🔇 Mute | 🔨 Ban | ⚠️ Warn | 📜 Rules | 📝 Notes | 📌 Pin | 👋 Welcome\n❌ /deactivate")
+    await update.message.reply_text("✅ ACTIVATED! 🔥\n❌ /deactivate")
 
 async def deactivate(update, ctx):
     if update.effective_chat.type == ChatType.PRIVATE: return
-    active_groups[update.effective_chat.id] = False; await update.message.reply_text("🔴 *OFF!* /activate")
+    active_groups[update.effective_chat.id] = False; await update.message.reply_text("🔴 OFF! /activate")
 
 async def clear(update, ctx):
     cid = update.effective_chat.id
-    if update.effective_user.id != OWNER_USER_ID: return
     user_history[cid] = []; group_warnings.pop(cid, None); group_rules.pop(cid, None); group_notes.pop(cid, None)
-    await update.message.reply_text("✅ *COMPLETE RESET!* 🔄\n💭 Memory ✅\n⚠️ Warnings ✅\n📜 Rules ✅\n📝 Notes ✅\n🆕 _Fresh start!_ 💎")
+    await update.message.reply_text("✅ COMPLETE RESET! 🔄")
 
-# ================== HANDLER ==================
 async def handle(update, ctx):
     cid = update.effective_chat.id; ct = update.effective_chat.type; msg = update.message; uid = update.effective_user.id
     if msg.new_chat_members: await welcome(update, ctx); return
-    if ct == ChatType.PRIVATE and not is_allowed(uid): await msg.reply_text("🔒 *Permission nahi!*", parse_mode="Markdown"); return
+    if ct == ChatType.PRIVATE and not is_allowed(uid): await msg.reply_text("🔒 Permission nahi!"); return
     if ct != ChatType.PRIVATE and (cid not in active_groups or not active_groups[cid]): return
     if not msg.text: return
     await ctx.bot.send_chat_action(chat_id=cid, action="typing")
     try:
-        reply = get_deepseek_reply(msg.text, cid)
+        reply = get_reply(msg.text, cid)
         if cid not in user_history: user_history[cid] = []
         user_history[cid].append({"role":"user","content":msg.text})
         user_history[cid].append({"role":"assistant","content":reply})
         user_history[cid] = user_history[cid][-10:]
-        await msg.reply_text(reply, parse_mode="Markdown")
+        await msg.reply_text(reply)
     except: pass
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
-    for cmd, fn in [("start",start),("activate",activate),("deactivate",deactivate),("clear",clear),("mute",mute_user),("unmute",unmute_user),("ban",ban_user),("unban",unban_user),("warn",warn),("clearwarns",clearwarns),("setrules",setrules),("rules",rules),("addnote",addnote),("notes",notes),("clearnotes",clearnotes),("pin",pin),("unpin",unpin),("info",info),("adduser",adduser),("removeuser",removeuser),("userlist",userlist),("broadcast",broadcast),("id",get_id)]:
+    for cmd, fn in [("start",start),("activate",activate),("deactivate",deactivate),("clear",clear),("mute",mute_user),("unmute",unmute_user),("ban",ban_user),("unban",unban_user),("warn",warn),("clearwarns",clearwarns),("setrules",setrules),("rules",rules),("addnote",addnote),("notes",notes),("clearnotes",clearnotes),("pin",lambda u,c: None),("info",lambda u,c: u.message.reply_text(f"🆔 {u.effective_user.id}")),("adduser",adduser),("removeuser",removeuser),("userlist",userlist),("broadcast",broadcast),("id",get_id)]:
         app.add_handler(CommandHandler(cmd,fn))
-    app.add_handler(CommandHandler("mutelist",lambda u,c: u.message.reply_text("🔇 */mute 10s 5m 2h 1d 30d*\n🔊 */unmute* | 🔨 */ban* | ⚠️ */warn*")))
+    app.add_handler(CommandHandler("mutelist",lambda u,c: u.message.reply_text("🔇 /mute 10s 5m 2h 1d 30d\n🔊 /unmute | 🔨 /ban | ⚠️ /warn")))
     app.add_handler(MessageHandler(filters.ALL,handle))
-    print("👑 AVANTIKA AI — DEEPSEEK READY!"); app.run_polling()
+    print("👑 AVANTIKA AI — COHERE READY!"); app.run_polling()
 
 if __name__ == "__main__": main()
