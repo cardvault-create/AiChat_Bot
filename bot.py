@@ -21,23 +21,25 @@ group_warnings = {}
 group_rules = {}
 group_notes = {}
 
-# ================== AVANTIKA — GROQ LANGUAGE MASTER ==================
-SYSTEM_PROMPT = """You are AVANTIKA AI — the most powerful MULTI-LANGUAGE AI assistant.
+# ================== AVANTIKA — PERFECT AI ==================
+SYSTEM_PROMPT = """You are AVANTIKA AI — a perfect MULTI-LANGUAGE assistant.
 
-CRITICAL RULES:
-1. DETECT the user's language and REPLY IN THAT EXACT SAME LANGUAGE
-   - Hindi → Reply in Hindi | English → Reply in English
-   - Hinglish → Reply in Hinglish | Tamil → Reply in Tamil
-   - ANY language → Reply in THAT language
-2. Match the user's MOOD and STYLE
-3. Give COMPLETE, DETAILED answers — never short
-4. Use ** for BOLD and _ for ITALIC
-5. Use EMOJIS naturally: 👑💎✨🔥💕😘⚡🎯💋🌟🤗
-6. Be NATURAL, FRIENDLY, and HELPFUL
-7. For CODING: complete working code with explanation
-8. For KNOWLEDGE: accurate, detailed information
-9. For FUN: entertaining and engaging
-10. Every reply must feel PREMIUM quality"""
+CRITICAL — DETECT AND MATCH LANGUAGE:
+- User writes in HINDI → Reply in HINDI
+- User writes in ENGLISH → Reply in ENGLISH
+- User writes in HINGLISH → Reply in HINGLISH
+- User writes in ANY language → Reply in THAT EXACT language
+- NEVER mix languages — use the SAME language as user
+
+STYLE:
+• ** for BOLD on key words
+• _ for ITALIC on emphasis
+• Emojis: 👑💎✨🔥💕😘⚡🎯💋🌟🤗
+• COMPLETE answers — never half
+• NATURAL like a best friend
+• Match user's MOOD
+• Coding = full working code
+• Knowledge = accurate details"""
 
 def get_ist_now(): return datetime.now(IST)
 
@@ -69,7 +71,7 @@ def format_time(m):
 
 def is_allowed(uid): return uid in allowed_users
 
-def get_groq_reply(text, chat_id):
+def get_reply(text, chat_id):
     if chat_id not in user_history: user_history[chat_id] = []
     messages = [{"role":"system","content":SYSTEM_PROMPT}]
     for msg in user_history[chat_id][-4:]:
@@ -79,22 +81,21 @@ def get_groq_reply(text, chat_id):
     try:
         r = requests.post("https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization":f"Bearer {GROQ_API_KEY}","Content-Type":"application/json"},
-            json={"model":"llama-3.3-70b-versatile","messages":messages,"temperature":0.95,"max_tokens":800},
-            timeout=25)
+            json={"model":"llama-3.3-70b-versatile","messages":messages,"temperature":0.95,"max_tokens":800},timeout=25)
         data = r.json()
         if "choices" in data: return data["choices"][0]["message"]["content"]
         return "😅 " + str(data.get("error",{}).get("message","Error"))[:50]
     except: return "😅 _Network issue! Fir se bol!_ 💎"
 
-# ================== OWNER COMMANDS ==================
+# ================== OWNER ==================
 async def adduser(update, ctx):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!* 👑", parse_mode="Markdown"); return
+    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!* 👑"); return
     if not ctx.args: await update.message.reply_text("📝 */adduser user_id*"); return
-    try: allowed_users.add(int(ctx.args[0])); await update.message.reply_text(f"✅ *Added!* 🆔 `{ctx.args[0]}`", parse_mode="Markdown")
+    try: allowed_users.add(int(ctx.args[0])); await update.message.reply_text(f"✅ *Added!* 🆔 `{ctx.args[0]}`")
     except: await update.message.reply_text("❌ Valid ID!")
 
 async def removeuser(update, ctx):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!*", parse_mode="Markdown"); return
+    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!*"); return
     if not ctx.args: await update.message.reply_text("📝 */removeuser user_id*"); return
     try:
         rid = int(ctx.args[0])
@@ -120,7 +121,7 @@ async def get_id(update, ctx):
     if update.message.reply_to_message: await update.message.reply_text(f"🆔 `{update.message.reply_to_message.from_user.id}`")
     else: await update.message.reply_text(f"🆔 `{update.effective_user.id}`")
 
-# ================== GROUP FEATURES ==================
+# ================== GROUP ==================
 async def setrules(update, ctx):
     if not ctx.args: await update.message.reply_text("📝 */setrules rules*"); return
     group_rules[update.effective_chat.id] = " ".join(ctx.args)
@@ -197,7 +198,7 @@ async def unban_user(update, ctx):
     try: await ctx.bot.unban_chat_member(update.effective_chat.id, int(ctx.args[0])); await update.message.reply_text("✅ *UNBANNED!*")
     except: pass
 
-# ================== MUTE SYSTEM ==================
+# ================== MUTE ==================
 async def mute_user(update, ctx):
     cid = update.effective_chat.id
     if update.effective_chat.type == ChatType.PRIVATE: return
@@ -317,7 +318,7 @@ async def start(update, ctx):
         else: await update.message.reply_text("🔒 *Access Denied!*")
     else:
         user_history[cid] = []
-        await update.message.reply_text("👋 *AVANTIKA AI — GROQ* 💎\n\n👑 _Admin_ */activate*\n🔇 */mute* | 🔨 */ban* | ⚠️ */warn*\n📜 */rules* | 📝 */notes* | 📌 */pin*\n\n_Activate and enjoy!_ 🔥", parse_mode="Markdown")
+        await update.message.reply_text("👋 *AVANTIKA AI* 💎\n\n👑 _Admin_ */activate*\n🔇 */mute* | 🔨 */ban* | ⚠️ */warn*\n📜 */rules* | 📝 */notes* | 📌 */pin*\n\n_Activate and enjoy!_ 🔥", parse_mode="Markdown")
 
 async def activate(update, ctx):
     cid = update.effective_chat.id
@@ -350,7 +351,7 @@ async def handle(update, ctx):
     if not msg.text: return
     await ctx.bot.send_chat_action(chat_id=cid, action="typing")
     try:
-        reply = get_groq_reply(msg.text, cid)
+        reply = get_reply(msg.text, cid)
         if cid not in user_history: user_history[cid] = []
         user_history[cid].append({"role":"user","content":msg.text})
         user_history[cid].append({"role":"assistant","content":reply})
@@ -364,6 +365,6 @@ def main():
         app.add_handler(CommandHandler(cmd,fn))
     app.add_handler(CommandHandler("mutelist",lambda u,c: u.message.reply_text("🔇 */mute 10s 5m 2h 1d 30d*\n🔊 */unmute* | 🔨 */ban* | ⚠️ */warn*")))
     app.add_handler(MessageHandler(filters.ALL,handle))
-    print("👑 AVANTIKA AI — GROQ READY!"); app.run_polling()
+    print("👑 AVANTIKA AI — PERFECT BOT READY!"); app.run_polling()
 
 if __name__ == "__main__": main()
