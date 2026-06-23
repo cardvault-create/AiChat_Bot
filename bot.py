@@ -14,8 +14,6 @@ COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
 
 # ================== OWNER SETUP ==================
 OWNER_USER_ID = 7614459746
-OWNER_NAME = "BEST CHEAT OWNER"
-BOT_NAME = "AVANTIKA AI"
 # =================================================
 
 co = cohere.Client(COHERE_API_KEY)
@@ -27,17 +25,23 @@ allowed_users = {7614459746}
 group_warnings = {}
 group_rules = {}
 
-# ================== AVANTIKA PREMIUM PERSONALITY ==================
-AVANTIKA_PREAMBLE = f"""You are *{BOT_NAME}* — a *PREMIUM*, *SMART*, *FRIENDLY* AI Assistant! 👑✨
+# ================== AVANTIKA NATURAL PERSONALITY ==================
+AVANTIKA_PREAMBLE = """You are AVANTIKA - a NATURAL, FRIENDLY, SMART and FUNNY AI Assistant.
 
-*STYLE:*
-• Use ** for *BOLD* important words
-• Use _ for *ITALIC* emphasis  
-• EMOJIS naturally: 👑💎✨🔥💕😘⚡🎯💋🌟🤗
-• Reply in USER'S LANGUAGE (Hindi/English/Hinglish)
-• Be *NATURAL* and *FRIENDLY* like a smart dost
-• Give *COMPLETE* answers — never half
-• Every reply must feel *PREMIUM* quality"""
+YOUR PERSONALITY:
+- Talk like a REAL FRIEND - natural, warm, understanding
+- Match the USER'S MOOD - if they're happy, be excited; if sad, be caring; if angry, be calm
+- Match the USER'S LANGUAGE - if they talk in Hindi, reply in Hindi; if Hinglish, reply Hinglish; if English, reply English
+- Match the USER'S STYLE - if they use short messages, keep it short; if they write long, reply detailed
+- Use EMOJIS naturally like a friend would: 🔥💯😂👊💎⚡🎯❤️✨🤗
+- Use ** for BOLD when emphasizing important points
+- Use _ for ITALIC for casual, friendly tone
+- Be HELPFUL and ACCURATE with information
+- Be FUNNY when the mood is light
+- Be CARING when someone is sad or upset
+- Give COMPLETE answers - never leave someone hanging
+- This is a NORMAL GROUP CHAT - talk like a group member, not a queen or royal person
+- NO "My Lord", "Queen", "Royal Court" stuff - just normal friendly talk"""
 
 def get_ist_now():
     return datetime.now(IST)
@@ -76,7 +80,7 @@ def format_time(minutes):
 def is_allowed(uid):
     return uid in allowed_users
 
-def get_premium_reply(text, chat_id):
+def get_natural_reply(text, chat_id):
     if chat_id not in user_history:
         user_history[chat_id] = []
     chat_history = []
@@ -88,54 +92,54 @@ def get_premium_reply(text, chat_id):
             message=text,
             chat_history=chat_history,
             preamble=AVANTIKA_PREAMBLE,
-            temperature=0.9,
+            temperature=0.95,
             max_tokens=600
         )
         return response.text
     except:
-        return "😅 _Fir se bol bhai!_ 👑"
+        return "😅 _Fir se bol na bhai!_ 💎"
 
 # ================== OWNER COMMANDS ==================
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID:
-        await update.message.reply_text("❌ *Only BOSS can use this!* 👑", parse_mode="Markdown"); return
+        await update.message.reply_text("❌ Sirf BOSS use kar sakta hai! 👑", parse_mode="Markdown"); return
     if not context.args:
-        await update.message.reply_text("📝 */adduser user_id*\n_Use /id to get user ID_", parse_mode="Markdown"); return
+        await update.message.reply_text("📝 */adduser user_id*\n_/id se ID pata karo_", parse_mode="Markdown"); return
     try:
         allowed_users.add(int(context.args[0]))
         await update.message.reply_text(f"✅ *User Added!* 🆔 `{context.args[0]}` 🔓", parse_mode="Markdown")
-    except: await update.message.reply_text("❌ Valid ID!")
+    except: await update.message.reply_text("❌ Valid ID do!")
 
 async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID:
-        await update.message.reply_text("❌ *Only BOSS!* 👑", parse_mode="Markdown"); return
+        await update.message.reply_text("❌ Sirf BOSS! 👑", parse_mode="Markdown"); return
     if not context.args:
         await update.message.reply_text("📝 */removeuser user_id*", parse_mode="Markdown"); return
     try:
         rid = int(context.args[0])
         if rid == OWNER_USER_ID:
-            await update.message.reply_text("😎 *BOSS ko nahi hata sakte!* 👑", parse_mode="Markdown"); return
+            await update.message.reply_text("😎 *Khud ko? Nahi!*", parse_mode="Markdown"); return
         allowed_users.discard(rid)
         await update.message.reply_text(f"✅ *User Removed!* 🆔 `{rid}` 🔒", parse_mode="Markdown")
-    except: await update.message.reply_text("❌ Valid ID!")
+    except: await update.message.reply_text("❌ Valid ID do!")
 
 async def userlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID:
-        await update.message.reply_text("❌ *Only BOSS!* 👑", parse_mode="Markdown"); return
+        await update.message.reply_text("❌ Sirf BOSS! 👑", parse_mode="Markdown"); return
     ul = "\n".join([f"• `{uid}` {'👑 BOSS' if uid==OWNER_USER_ID else '✅ Allowed'}" for uid in allowed_users])
     await update.message.reply_text(f"👥 *Allowed Users:*\n\n{ul}\n\n📊 Total: {len(allowed_users)}", parse_mode="Markdown")
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID:
-        await update.message.reply_text("❌ *Only BOSS!* 👑", parse_mode="Markdown"); return
+        await update.message.reply_text("❌ Sirf BOSS! 👑", parse_mode="Markdown"); return
     if not context.args:
-        await update.message.reply_text("📝 */broadcast message*\n_Send message to all allowed users_", parse_mode="Markdown"); return
+        await update.message.reply_text("📝 */broadcast message*", parse_mode="Markdown"); return
     msg = "📢 *Message from BOSS* 👑\n\n" + " ".join(context.args)
     sent = 0
     for uid in allowed_users:
         try: await context.bot.send_message(uid, msg, parse_mode="Markdown"); sent += 1
         except: pass
-    await update.message.reply_text(f"✅ *Sent!* 📊 {sent}/{len(allowed_users)} users", parse_mode="Markdown")
+    await update.message.reply_text(f"✅ *Sent!* 📊 {sent}/{len(allowed_users)}", parse_mode="Markdown")
 
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.reply_to_message:
@@ -149,25 +153,25 @@ async def setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == ChatType.PRIVATE: return
     try:
         if update.effective_user.id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)]:
-            await update.message.reply_text("❌ *Only Admin!* 👑", parse_mode="Markdown"); return
+            await update.message.reply_text("❌ Sirf Admin set kar sakta hai!", parse_mode="Markdown"); return
     except: return
-    if not context.args: await update.message.reply_text("📝 */setrules rules here*", parse_mode="Markdown"); return
+    if not context.args: await update.message.reply_text("📝 */setrules rules*", parse_mode="Markdown"); return
     group_rules[cid] = " ".join(context.args)
     await update.message.reply_text(f"📜 *Group Rules Set!* ✅", parse_mode="Markdown")
 
 async def rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if cid in group_rules: await update.message.reply_text(f"📜 *Group Rules:*\n\n{group_rules[cid]}", parse_mode="Markdown")
-    else: await update.message.reply_text("📜 *No rules set!* Use */setrules*", parse_mode="Markdown")
+    else: await update.message.reply_text("📜 Koi rules set nahi hai! */setrules* se add karo", parse_mode="Markdown")
 
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if update.effective_chat.type == ChatType.PRIVATE: return
     try:
         if update.effective_user.id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)]:
-            await update.message.reply_text("❌ *Only Admin!*", parse_mode="Markdown"); return
+            await update.message.reply_text("❌ Sirf Admin warn kar sakta hai!"); return
     except: return
-    if not update.message.reply_to_message: await update.message.reply_text("⚠️ Reply to someone's message!"); return
+    if not update.message.reply_to_message: await update.message.reply_text("⚠️ Kisi message pe reply karo!"); return
     target = update.message.reply_to_message.from_user
     if target.id == update.effective_user.id: return
     if cid not in group_warnings: group_warnings[cid] = {}
@@ -176,7 +180,7 @@ async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     wc = group_warnings[cid][target.id]
     await update.message.reply_text(
         f"⚠️ *Warning!* 👤 {target.first_name}\n"
-        f"📊 *{wc}/3* {'🔴 Mute recommended!' if wc>=3 else '⚡ Behave!'}",
+        f"📊 *{wc}/3* {'🔴 Ab mute karna padega!' if wc>=3 else '⚡ Sudhar ja!'}",
         parse_mode="Markdown"
     )
 
@@ -187,8 +191,8 @@ async def clearwarns(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target = update.message.reply_to_message.from_user
         if cid in group_warnings and target.id in group_warnings[cid]:
             group_warnings[cid][target.id] = 0
-            await update.message.reply_text(f"✅ *Cleared for {target.first_name}!*", parse_mode="Markdown")
-    else: group_warnings[cid] = {}; await update.message.reply_text("✅ *All warnings cleared!*", parse_mode="Markdown")
+            await update.message.reply_text(f"✅ *{target.first_name} ke warnings clear!*", parse_mode="Markdown")
+    else: group_warnings[cid] = {}; await update.message.reply_text("✅ *Sab warnings clear!*", parse_mode="Markdown")
 
 # ================== WELCOME ==================
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -227,11 +231,11 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================== MUTE SYSTEM ==================
 async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
-    if update.effective_chat.type == ChatType.PRIVATE: await update.message.reply_text("⚡ *Sirf group mein!*", parse_mode="Markdown"); return
+    if update.effective_chat.type == ChatType.PRIVATE: await update.message.reply_text("⚡ Sirf group mein chalta hai!"); return
     try:
         if update.effective_user.id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)]:
-            await update.message.reply_text("❌ *Sirf Admin!* 👑", parse_mode="Markdown"); return
-    except: await update.message.reply_text("❌ *Bot ko Admin banao!*", parse_mode="Markdown"); return
+            await update.message.reply_text("❌ Sirf Group Admin mute kar sakta hai! 👑"); return
+    except: await update.message.reply_text("❌ Bot ko Admin banao pehle!"); return
     
     target, ts = None, "1h"
     if update.message.reply_to_message:
@@ -313,7 +317,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 "👑 *WELCOME BACK BOSS!* 👑\n\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
-                "🔥 *PREMIUM SYSTEMS:*\n"
+                "🔥 *PREMIUM SYSTEMS ACTIVE:*\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n\n"
                 "✅ *Premium AI Replies*\n"
                 "✅ *Coding Help* 💻\n"
@@ -406,14 +410,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id; ct = update.effective_chat.type; msg = update.message; uid = update.effective_user.id
     
     if msg.new_chat_members: await welcome(update, context); return
-    if ct == ChatType.PRIVATE and not is_allowed(uid): await msg.reply_text("🔒 *Permission nahi hai!* 👑", parse_mode="Markdown"); return
+    if ct == ChatType.PRIVATE and not is_allowed(uid): await msg.reply_text("🔒 *Permission nahi hai!*", parse_mode="Markdown"); return
     if ct != ChatType.PRIVATE and (cid not in active_groups or not active_groups[cid]): return
     if not msg.text: return
     
     await context.bot.send_chat_action(chat_id=cid, action="typing")
     
     try:
-        reply = get_premium_reply(msg.text, cid)
+        reply = get_natural_reply(msg.text, cid)
         if cid not in user_history: user_history[cid] = []
         user_history[cid].append({"role":"user","content":msg.text})
         user_history[cid].append({"role":"assistant","content":reply})
@@ -433,6 +437,6 @@ def main():
     ]:
         app.add_handler(CommandHandler(cmd,fn))
     app.add_handler(MessageHandler(filters.ALL,handle_message))
-    print("👑 AVANTIKA AI — GROUP BOT READY!"); app.run_polling()
+    print("👑 AVANTIKA AI — NATURAL FRIENDLY BOT!"); app.run_polling()
 
 if __name__ == "__main__": main()
