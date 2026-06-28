@@ -39,7 +39,7 @@ group_afk = {}
 last_message_time = {}
 group_blocklink = {}
 group_link_warns = {}
-permission_off_groups = {}
+locked_admins = {}
 
 # ================== ♡ Ｓｏｎａｋｓｈｉ ＡＩ ♡ ==================
 SONAKSHI_PREAMBLE = """You are ♡ Ｓｏｎａｋｓｈｉ ＡＩ ♡ — Premium, Smart, Beautiful Multi-Language AI Assistant 🫧✨💖
@@ -120,10 +120,76 @@ def has_link(text):
         if re.search(p, text, re.IGNORECASE): return True
     return False
 
-def is_admin_blocked(chat_id, user_id):
-    if chat_id in permission_off_groups:
-        if user_id != OWNER_USER_ID: return True
+def is_owner(user_id):
+    return user_id == OWNER_USER_ID
+
+def is_admin_locked(chat_id, user_id):
+    if chat_id in locked_admins:
+        if user_id in locked_admins[chat_id]:
+            return True
     return False
+
+def can_use_admin_commands(chat_id, user_id, admin_ids):
+    if is_owner(user_id): return True
+    if is_admin_locked(chat_id, user_id): return False
+    return user_id in admin_ids
+
+def get_locked_msg():
+    return (
+        "🚫 *_YOUR PERMISSIONS HAVE BEEN REVOKED!_* 🚫\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "👑 *_THE LORD HAS DISABLED YOUR ACCESS!_* 👑\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "💀 _You CANNOT use any bot commands anymore!_ \n"
+        "💀 _You have NO POWER here!_ \n"
+        "💀 _Sirf LORD hi tumhe wapas permission de sakta hai!_ \n\n"
+        "🛡️ *_THE LORD IS SUPREME!_* ⚡\n"
+        "🙇 _Bow before the LORD!_ 🙇"
+    )
+
+# ================== FATHER OF BOT MESSAGE ==================
+def get_father_msg():
+    return (
+        "👑 *_SORRY! YOU CAN'T DO THAT!_* 👑\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🛡️ *_HE IS THE FATHER OF THIS BOT!_* 🛡️\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "💀 *_You CANNOT ban/mute/warn/kick THE LORD!_* 💀\n"
+        "💀 *_You CANNOT use any command against HIM!_* 💀\n"
+        "💀 *_You CANNOT touch HIM!_* 💀\n\n"
+        "👑 *_HE IS_* `7614459746`\n"
+        "👑 *_HE IS THE FATHER OF THIS BOT!_*\n"
+        "👑 *_HE IS THE SUPREME LEADER!_*\n"
+        "👑 *_HE IS THE OWNER OF EVERYTHING!_*\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "⚡ *_YOU HAVE NO POWER AGAINST HIM!_* ⚡\n"
+        "⚡ *_HE IS IMMORTAL! HE IS ETERNAL!_* ⚡\n"
+        "⚡ *_HE IS THE FATHER OF BOT!_* ⚡\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🙇 *_BOW BEFORE THE FATHER!_* 🙇\n"
+        "🙇 *_RESPECT THE LORD!_* 🙇\n"
+        "🙇 *_HE IS YOUR MASTER!_* 🙇"
+    )
+
+# ================== EXTRACT TARGET USER ==================
+async def extract_target_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    target = None
+    if update.message.reply_to_message:
+        target = update.message.reply_to_message.from_user
+    elif context.args:
+        arg = context.args[0]
+        if arg.startswith('@'): arg = arg[1:]
+        if arg.isdigit():
+            try:
+                chat = await context.bot.get_chat(int(arg))
+                target = chat
+            except: pass
+        else:
+            try:
+                chat = await context.bot.get_chat(f"@{arg}")
+                target = chat
+            except: pass
+    return target
 
 # ================== GAME MENU ==================
 def get_game_menu():
@@ -142,60 +208,135 @@ def get_game_menu():
 def get_back_button():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴇɴᴜ", callback_data="gm_back")]])
 
-def get_blocked_msg():
-    return (
-        "🚫 *_ACCESS DENIED!_* 🚫\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "👑 *_THE LORD HAS DISABLED ADMIN COMMANDS!_* 👑\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🛡️ *_Only_* `7614459746` *_can use this bot!_*\n\n"
-        "💀 _You have NO POWER here!_ \n"
-        "⚡ *_The LORD is SUPREME!_* ⚡"
-    )
-
 # ================== /permissionoff ==================
 async def cmd_permissionoff(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id; user_id = update.effective_user.id
     
-    if user_id != OWNER_USER_ID:
-        await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown")
+    # ONLY OWNER
+    if not is_owner(user_id):
+        await update.message.reply_text(get_father_msg(), parse_mode="Markdown")
         return
     
-    if chat_id in permission_off_groups:
-        del permission_off_groups[chat_id]
+    target = await extract_target_user(update, context)
+    
+    if not target:
         await update.message.reply_text(
-            "✅ *_ADMIN PERMISSIONS RESTORED!_* 🔓\n\n"
+            "🔒 *_PERMISSION OFF_* 👑🫧\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🟢 _Ab sab admins commands use kar sakte hain!_\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "📌 *_Usage:_*\n"
+            "• _Reply to user +_ `/permissionoff`\n"
+            "• `/permissionoff @username`\n"
+            "• `/permissionoff user_id`\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🛡️ _Sirf FATHER (7614459746) use kar sakta hai!_",
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Cannot lock FATHER
+    if is_owner(target.id):
+        await update.message.reply_text("👑 *_FATHER ko lock nahi kar sakte!_* 💀🫧", parse_mode="Markdown")
+        return
+    
+    if target.is_bot:
+        await update.message.reply_text("❌ *_Bot ko lock nahi kar sakte!_* 🫧", parse_mode="Markdown")
+        return
+    
+    if chat_id not in locked_admins:
+        locked_admins[chat_id] = []
+    
+    if target.id not in locked_admins[chat_id]:
+        locked_admins[chat_id].append(target.id)
+        await update.message.reply_text(
+            f"🔒 *_PERMISSION REVOKED!_* 🚫🫧\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 *_User:_* *{target.first_name}*\n"
+            f"🆔 *_ID:_* `{target.id}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"💀 _Ab ye user koi bhi bot command use nahi kar sakta!_\n"
+            f"💀 _Iski saari permissions CHHEEN LI GAYI HAIN!_\n"
+            f"💀 _Sirf FATHER ise wapas permission de sakta hai!_\n\n"
+            f"🔓 _Unlock:_ `/permissionon {target.id}`",
             parse_mode="Markdown"
         )
     else:
-        permission_off_groups[chat_id] = True
+        await update.message.reply_text(f"⚠️ *_Already Locked!_* 🫧", parse_mode="Markdown")
+
+# ================== /permissionon ==================
+async def cmd_permissionon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id; user_id = update.effective_user.id
+    
+    if not is_owner(user_id):
+        await update.message.reply_text(get_father_msg(), parse_mode="Markdown")
+        return
+    
+    target = await extract_target_user(update, context)
+    
+    if not target:
         await update.message.reply_text(
-            "🔒 *_ADMIN PERMISSIONS REVOKED!_* 🚫\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "👑 *_Only THE LORD (7614459746) can use commands now!_*\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💀 _Sab admins blocked! Koi kuch nahi kar sakta!_\n"
-            "🛡️ _Sirf LORD supreme hai!_ ⚡\n\n"
-            "🔓 _Restore: /permissionoff_",
+            "🔓 *_PERMISSION ON_* 👑🫧\n\n"
+            "📌 _Reply / @username / user_id_\n"
+            "🛡️ _Sirf FATHER use kar sakta hai!_",
             parse_mode="Markdown"
         )
+        return
+    
+    if chat_id in locked_admins and target.id in locked_admins[chat_id]:
+        locked_admins[chat_id].remove(target.id)
+        if not locked_admins[chat_id]: del locked_admins[chat_id]
+        await update.message.reply_text(
+            f"✅ *_PERMISSION RESTORED!_* 🔓🫧\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 *_User:_* *{target.first_name}*\n"
+            f"🆔 *_ID:_* `{target.id}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🟢 _Ab ye user wapas bot commands use kar sakta hai!_\n"
+            f"👑 _FATHER ne permission wapas de di!_",
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(f"⚠️ *_Not Locked!_* 🫧", parse_mode="Markdown")
+
+# ================== /permissionlist ==================
+async def cmd_permissionlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id; user_id = update.effective_user.id
+    
+    if not is_owner(user_id):
+        await update.message.reply_text(get_father_msg(), parse_mode="Markdown")
+        return
+    
+    if chat_id in locked_admins and locked_admins[chat_id]:
+        locked_list = []
+        for uid in locked_admins[chat_id]:
+            try:
+                user = await context.bot.get_chat(uid)
+                name = user.first_name
+            except: name = "Unknown"
+            locked_list.append(f"• *{name}* — `{uid}` 🔒")
+        
+        await update.message.reply_text(
+            f"🔒 *_LOCKED USERS_* 🚫🫧\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{chr(10).join(locked_list)}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📊 *_Total Locked:_* {len(locked_admins[chat_id])}\n\n"
+            f"🔓 _Unlock:_ `/permissionon user_id`",
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text("🟢 *_NO LOCKED USERS!_* 🫧", parse_mode="Markdown")
 
 # ================== /delete ==================
 async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id; user_id = update.effective_user.id
     
-    if is_admin_blocked(chat_id, user_id): 
-        await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    if is_admin_locked(chat_id, user_id):
+        await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     
     if update.effective_chat.type == ChatType.PRIVATE: return
     
     admin_ids = await get_admin_ids(chat_id, context)
-    if user_id not in admin_ids and user_id != OWNER_USER_ID:
+    if not can_use_admin_commands(chat_id, user_id, admin_ids):
         await update.message.reply_text("❌ *_Sirf Admin kar sakta hai!_* 👑🫧", parse_mode="Markdown"); return
     
     if not update.message.reply_to_message:
@@ -205,48 +346,37 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_to_message.delete()
         await update.message.delete()
     except:
-        await update.message.reply_text("❌ *_Delete failed! Bot ko permission do!_* 🫧", parse_mode="Markdown")
+        await update.message.reply_text("❌ *_Delete failed!_* 🫧", parse_mode="Markdown")
 
 # ================== /blocklink ==================
 async def cmd_blocklink(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id; user_id = update.effective_user.id
     
-    if is_admin_blocked(chat_id, user_id): 
-        await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    if is_admin_locked(chat_id, user_id):
+        await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     
     if update.effective_chat.type == ChatType.PRIVATE: return
     
     admin_ids = await get_admin_ids(chat_id, context)
-    if user_id not in admin_ids and user_id != OWNER_USER_ID:
-        await update.message.reply_text("❌ *_Sirf Admin kar sakta hai!_* 👑🫧", parse_mode="Markdown"); return
+    if not can_use_admin_commands(chat_id, user_id, admin_ids):
+        await update.message.reply_text("❌ *_Sirf Admin!_* 👑🫧", parse_mode="Markdown"); return
     
     if chat_id in group_blocklink:
         del group_blocklink[chat_id]
         if chat_id in group_link_warns: del group_link_warns[chat_id]
-        await update.message.reply_text(
-            "🔓 *_LINK BLOCK — DISABLED!_* 🟢🫧\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "💬 _Ab users links bhej sakte hain!_\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("🔓 *_Link Block OFF!_* 🟢🫧", parse_mode="Markdown")
     else:
         group_blocklink[chat_id] = True
         group_link_warns[chat_id] = {}
         await update.message.reply_text(
-            "🔒 *_LINK BLOCK — ENABLED!_* 🔴🫧\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "⚠️ *_RULES:_*\n"
-            "• 🔗 _Links_ *AUTO DELETE* _honge_\n"
-            "• ⚠️ _3 link warnings =_ *30 MIN MUTE* 🔇\n"
-            "• 👑 _Admins exempt hain_\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🔓 _Disable: /blocklink_",
+            "🔒 *_LINK BLOCK ON!_* 🔴🫧\n\n"
+            "⚠️ Links = AUTO DELETE\n"
+            "⚠️ 3 links = 30 MIN MUTE\n"
+            "👑 Admins exempt",
             parse_mode="Markdown"
         )
 
-# ================== OWNER ==================
+# ================== OWNER COMMANDS ==================
 async def adduser(update, context):
     if update.effective_user.id != OWNER_USER_ID: return
     if context.args:
@@ -279,8 +409,8 @@ async def get_id(update, context):
 
 # ================== NOTES ==================
 async def addnote(update, context):
-    cid = update.effective_chat.id
-    if is_admin_blocked(cid, update.effective_user.id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if not context.args: return
     if cid not in group_notes: group_notes[cid] = []
     group_notes[cid].append(" ".join(context.args))
@@ -292,22 +422,22 @@ async def notes(update, context):
     else: await update.message.reply_text("📝 *_No notes!_* 🫧 /addnote", parse_mode="Markdown")
 
 async def clearnotes(update, context): 
-    cid = update.effective_chat.id
-    if is_admin_blocked(cid, update.effective_user.id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     group_notes[cid] = []
     await update.message.reply_text("✅ *_Cleared!_* 🗑️🫧", parse_mode="Markdown")
 
 # ================== PIN ==================
 async def pin(update, context):
-    cid = update.effective_chat.id
-    if is_admin_blocked(cid, update.effective_user.id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if not update.message.reply_to_message: return
     try: await update.message.reply_to_message.pin(); await update.message.reply_text("📌 *_Pinned!_* ✅🫧", parse_mode="Markdown")
     except: pass
 
 async def unpin(update, context):
-    cid = update.effective_chat.id
-    if is_admin_blocked(cid, update.effective_user.id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if update.effective_chat.type == ChatType.PRIVATE: return
     try: await context.bot.unpin_all_chat_messages(cid)
     except: pass
@@ -325,8 +455,8 @@ async def info(update, context):
 
 # ================== RULES ==================
 async def setrules(update, context):
-    cid = update.effective_chat.id
-    if is_admin_blocked(cid, update.effective_user.id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if not context.args: return
     group_rules[cid] = " ".join(context.args)
     await update.message.reply_text("📜 *_Rules Set!_* ✅🫧", parse_mode="Markdown")
@@ -336,24 +466,28 @@ async def rules(update, context):
     if cid in group_rules: await update.message.reply_text(f"📜 *_RULES_* 🫧\n\n{group_rules[cid]}", parse_mode="Markdown")
     else: await update.message.reply_text("📜 *_No rules!_* 🫧 /setrules", parse_mode="Markdown")
 
-# ================== WARN (3 = 30min MUTE) ==================
+# ================== WARN (FATHER IMMUNE) ==================
 async def warn(update, context):
-    cid = update.effective_chat.id
-    user_id = update.effective_user.id
+    cid = update.effective_chat.id; user_id = update.effective_user.id
     
-    if is_admin_blocked(cid, user_id): 
-        await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    if is_admin_locked(cid, user_id): 
+        await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     
     if update.effective_chat.type == ChatType.PRIVATE: return
     
     admin_ids = await get_admin_ids(cid, context)
-    if user_id not in admin_ids and user_id != OWNER_USER_ID:
+    if not can_use_admin_commands(cid, user_id, admin_ids):
         await update.message.reply_text("❌ *_Sirf Admin kar sakta hai!_* 👑🫧", parse_mode="Markdown"); return
     
     if not update.message.reply_to_message: 
         await update.message.reply_text("⚠️ *_Kisi message pe reply karke /warn karo!_* 🫧", parse_mode="Markdown"); return
     
     t = update.message.reply_to_message.from_user
+    
+    # FATHER IMMUNE
+    if is_owner(t.id):
+        await update.message.reply_text(get_father_msg(), parse_mode="Markdown"); return
+    
     if t.is_bot or t.id == user_id: return
     
     if cid not in group_warnings: group_warnings[cid] = {}
@@ -379,9 +513,9 @@ async def warn(update, context):
                 f"🆔 *_ID:_* `{t.id}`\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
                 f"⚠️ *_Warnings:_* *3/3*\n"
-                f"⏱️ *_Mute Duration:_* *30 MINUTES*\n"
-                f"📅 *_Muted At:_* `{get_ist_now().strftime('%I:%M %p, %d %b')}`\n"
-                f"🔓 *_Unmute At:_* `{(get_ist_now() + timedelta(minutes=30)).strftime('%I:%M %p, %d %b')}`\n\n"
+                f"⏱️ *_Mute:_* *30 MINUTES*\n"
+                f"📅 *_Muted:_* `{get_ist_now().strftime('%I:%M %p, %d %b')}`\n"
+                f"🔓 *_Unmute:_* `{(get_ist_now() + timedelta(minutes=30)).strftime('%I:%M %p, %d %b')}`\n\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"💡 _Warnings reset! /unmute reply se manual!_",
                 parse_mode="Markdown")
@@ -409,13 +543,12 @@ async def warn(update, context):
             f"📊 *_Warning:_* *{wc}/3*\n"
             f"⚠️ *{3-wc} more = 30 MINUTE MUTE!* 🔇\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"💡 _Rules follow karo warna mute ho jaoge!_",
+            f"💡 _Rules follow karo!_",
             parse_mode="Markdown")
 
 async def clearwarns(update, context):
-    cid = update.effective_chat.id
-    user_id = update.effective_user.id
-    if is_admin_blocked(cid, user_id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if update.message.reply_to_message:
         t = update.message.reply_to_message.from_user
         if cid in group_warnings and t.id in group_warnings[cid]: group_warnings[cid][t.id] = 0
@@ -424,47 +557,58 @@ async def clearwarns(update, context):
         group_warnings[cid] = {}
         await update.message.reply_text("✅ *_All warnings cleared!_* 🧹🫧", parse_mode="Markdown")
 
-# ================== BAN ==================
+# ================== BAN (FATHER IMMUNE) ==================
 async def ban_user(update, context):
-    cid = update.effective_chat.id
-    user_id = update.effective_user.id
-    if is_admin_blocked(cid, user_id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; user_id = update.effective_user.id
+    
+    if is_admin_locked(cid, user_id): 
+        await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
+    
     if update.effective_chat.type == ChatType.PRIVATE: return
-    try:
-        if user_id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)] and user_id != OWNER_USER_ID:
-            await update.message.reply_text("❌ *_Sirf Admin!_* 👑🫧", parse_mode="Markdown"); return
-    except: return
+    
+    admin_ids = await get_admin_ids(cid, context)
+    if not can_use_admin_commands(cid, user_id, admin_ids):
+        await update.message.reply_text("❌ *_Sirf Admin kar sakta hai!_* 👑🫧", parse_mode="Markdown"); return
+    
     t = None
     if update.message.reply_to_message: t = update.message.reply_to_message.from_user
     elif context.args:
         try: t = (await context.bot.get_chat_member(cid, int(context.args[0]))).user
         except: pass
+    
     if not t or t.id == user_id or t.is_bot: return
+    
+    # FATHER IMMUNE
+    if is_owner(t.id):
+        await update.message.reply_text(get_father_msg(), parse_mode="Markdown"); return
+    
     try:
         await context.bot.ban_chat_member(cid, t.id)
         await update.message.reply_text(f"🔨 *_BANNED!_* 🚫🫧\n\n👤 *{t.first_name}*\n🆔 `{t.id}`\n🔓 /unban {t.id}", parse_mode="Markdown")
     except: pass
 
 async def unban_user(update, context):
-    cid = update.effective_chat.id
-    user_id = update.effective_user.id
-    if is_admin_blocked(cid, user_id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if not context.args: return
     try:
         await context.bot.unban_chat_member(cid, int(context.args[0]))
         await update.message.reply_text(f"✅ *_UNBANNED!_* 🔓🫧\n🆔 `{context.args[0]}`", parse_mode="Markdown")
     except: pass
 
-# ================== MUTE ==================
+# ================== MUTE (FATHER IMMUNE) ==================
 async def mute_user(update, context):
-    cid = update.effective_chat.id
-    user_id = update.effective_user.id
-    if is_admin_blocked(cid, user_id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; user_id = update.effective_user.id
+    
+    if is_admin_locked(cid, user_id): 
+        await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
+    
     if update.effective_chat.type == ChatType.PRIVATE: return
-    try:
-        if user_id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)] and user_id != OWNER_USER_ID:
-            await update.message.reply_text("❌ *_Sirf Admin!_* 👑🫧", parse_mode="Markdown"); return
-    except: return
+    
+    admin_ids = await get_admin_ids(cid, context)
+    if not can_use_admin_commands(cid, user_id, admin_ids):
+        await update.message.reply_text("❌ *_Sirf Admin kar sakta hai!_* 👑🫧", parse_mode="Markdown"); return
+    
     t, ts = None, "1h"
     if update.message.reply_to_message:
         t = update.message.reply_to_message.from_user
@@ -476,7 +620,13 @@ async def mute_user(update, context):
         except: return
     else:
         await update.message.reply_text("🔇 *_MUTE_* 🫧\n\n`/mute 10s` `/mute 5m` `/mute 2h` `/mute 1d` `/mute 30m`", parse_mode="Markdown"); return
+    
     if not t or t.id == user_id or t.is_bot: return
+    
+    # FATHER IMMUNE
+    if is_owner(t.id):
+        await update.message.reply_text(get_father_msg(), parse_mode="Markdown"); return
+    
     mm = parse_time(ts)
     if not mm or mm > 43200 or mm <= 0: return
     nw, ut = get_ist_now(), get_ist_now() + timedelta(minutes=mm)
@@ -503,9 +653,8 @@ async def mute_user(update, context):
     except: pass
 
 async def unmute_user(update, context):
-    cid = update.effective_chat.id
-    user_id = update.effective_user.id
-    if is_admin_blocked(cid, user_id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if update.effective_chat.type == ChatType.PRIVATE: return
     t = update.message.reply_to_message.from_user if update.message.reply_to_message else None
     if not t and context.args:
@@ -523,14 +672,14 @@ async def unmute_user(update, context):
 
 # ================== NIGHT/SLOW ==================
 async def cmd_nightmode(update, context):
-    cid = update.effective_chat.id
-    user_id = update.effective_user.id
-    if is_admin_blocked(cid, user_id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if update.effective_chat.type == ChatType.PRIVATE: return
-    try:
-        if user_id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)] and user_id != OWNER_USER_ID:
-            await update.message.reply_text("❌ *_Sirf Admin!_* 👑🫧", parse_mode="Markdown"); return
-    except: return
+    
+    admin_ids = await get_admin_ids(cid, context)
+    if not can_use_admin_commands(cid, uid, admin_ids):
+        await update.message.reply_text("❌ *_Sirf Admin!_* 👑🫧", parse_mode="Markdown"); return
+    
     if context.args and context.args[0].lower() == "off":
         if cid in group_nightmode: del group_nightmode[cid]
         await update.message.reply_text("✅ *_Night Mode OFF!_* 🟢🫧\n_Ab sab message kar sakte hain!_ 💬", parse_mode="Markdown"); return
@@ -547,14 +696,14 @@ async def cmd_nightmode(update, context):
     except: pass
 
 async def cmd_slowmode(update, context):
-    cid = update.effective_chat.id
-    user_id = update.effective_user.id
-    if is_admin_blocked(cid, user_id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if update.effective_chat.type == ChatType.PRIVATE: return
-    try:
-        if user_id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)] and user_id != OWNER_USER_ID:
-            await update.message.reply_text("❌ *_Sirf Admin!_* 👑🫧", parse_mode="Markdown"); return
-    except: return
+    
+    admin_ids = await get_admin_ids(cid, context)
+    if not can_use_admin_commands(cid, uid, admin_ids):
+        await update.message.reply_text("❌ *_Sirf Admin!_* 👑🫧", parse_mode="Markdown"); return
+    
     if context.args and context.args[0].lower() == "off":
         if cid in group_slowmode: del group_slowmode[cid]
         if cid in last_message_time: del last_message_time[cid]
@@ -676,16 +825,16 @@ async def poll_click(update, context):
 
 # ================== FILTERS ==================
 async def cmd_addfilter(update, context):
-    cid = update.effective_chat.id
-    if is_admin_blocked(cid, update.effective_user.id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if not context.args: return
     w = " ".join(context.args).lower()
     if cid not in group_filters: group_filters[cid] = []
     if w not in group_filters[cid]: group_filters[cid].append(w); await update.message.reply_text(f"🔞 *_Filtered:_* `{w}` 🫧", parse_mode="Markdown")
 
 async def cmd_rmfilter(update, context):
-    cid = update.effective_chat.id
-    if is_admin_blocked(cid, update.effective_user.id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if not context.args: return
     w = " ".join(context.args).lower()
     if cid in group_filters and w in group_filters[cid]: group_filters[cid].remove(w); await update.message.reply_text(f"✅ *_Removed:_* `{w}` 🫧", parse_mode="Markdown")
@@ -697,15 +846,15 @@ async def cmd_filters(update, context):
 
 # ================== WELCOME/GOODBYE ==================
 async def cmd_setwelcome(update, context):
-    cid = update.effective_chat.id
-    if is_admin_blocked(cid, update.effective_user.id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if not context.args: return
     group_welcome_msgs[cid] = " ".join(context.args)
     await update.message.reply_text("✅ *_Welcome Set!_* 🌸🫧", parse_mode="Markdown")
 
 async def cmd_setgoodbye(update, context):
-    cid = update.effective_chat.id
-    if is_admin_blocked(cid, update.effective_user.id): await update.message.reply_text(get_blocked_msg(), parse_mode="Markdown"); return
+    cid = update.effective_chat.id; uid = update.effective_user.id
+    if is_admin_locked(cid, uid): await update.message.reply_text(get_locked_msg(), parse_mode="Markdown"); return
     if not context.args: return
     group_goodbye_msgs[cid] = " ".join(context.args)
     await update.message.reply_text("✅ *_Goodbye Set!_* 👋🫧", parse_mode="Markdown")
@@ -765,7 +914,7 @@ async def cmd_quote(update, context):
     await update.message.reply_text(random.choice(q), parse_mode="Markdown")
 async def cmd_stats(update, context):
     cid = update.effective_chat.id
-    s = f"📊 *_STATS_* 🫧\n\n📝 Notes: {len(group_notes.get(cid,[]))}\n🔞 Filters: {len(group_filters.get(cid,[]))}\n🏆 Ranked: {len(group_ranks.get(cid,{}))}\n🔒 Blocklink: {'ON 🔴' if cid in group_blocklink else 'OFF 🟢'}\n⏱️ Slow: {group_slowmode.get(cid,'OFF')}s\n🌙 Night: {'🔴 ON' if cid in group_nightmode else '🟢 OFF'}"
+    s = f"📊 *_STATS_* 🫧\n\n📝 Notes: {len(group_notes.get(cid,[]))}\n🔞 Filters: {len(group_filters.get(cid,[]))}\n🏆 Ranked: {len(group_ranks.get(cid,{}))}\n🔒 Blocklink: {'ON' if cid in group_blocklink else 'OFF'}\n🛡️ Locked: {len(locked_admins.get(cid,[]))}\n⏱️ Slow: {group_slowmode.get(cid,'OFF')}s\n🌙 Night: {'ON' if cid in group_nightmode else 'OFF'}"
     await update.message.reply_text(s, parse_mode="Markdown")
 async def cmd_google(update, context):
     if context.args: await update.message.reply_text(f"🔍 [Search](https://www.google.com/search?q={'+'.join(context.args)}) 🫧", parse_mode="Markdown", disable_web_page_preview=False)
@@ -784,14 +933,14 @@ async def welcome(update, context):
                 "🫧 *_PREMIUM AI ASSISTANT JOINED!_* 🫧\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
                 "💖 *_Hey Beautiful People!_* 💖\n\n"
-                "🌸 _Main hoon_ *Ｓｏｎａｋｓｈｉ* — _aapki smart,_\n"
-                "_caring aur mast AI bestie!_ 🦋\n\n"
+                "🌸 _Main hoon_ *Ｓｏｎａｋｓｈｉ*\n\n"
                 "👑 *_Admin:_* `/start` → `/activate` ⚡\n\n"
                 "💬 *_AI Chat_* | 🎮 *_9 Games_* | 📊 *_Polls_*\n"
-                "🗑️ `/delete` | 🔒 `/blocklink` | ⚠️ `/warn`\n"
-                "🌙 *_Night_* | ⏱️ *_Slow_* | 🔇 *_Mute_* | 🔨 *_Ban_*\n\n"
+                "🗑️ `/delete` | 🔒 `/blocklink` | ⚠️ `/warn`\n\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                "🛡️ `/permissionoff` — _LORD MODE!_\n"
+                "🛡️ `/permissionoff @user` — _Lock admin!_\n"
+                "🔓 `/permissionon @user` — _Unlock admin!_\n"
+                "👑 *_7614459746 — FATHER OF BOT!_*\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
                 "💖 *_Chaloo dhamaka karte hain!_* 🫧✨🌸", parse_mode="Markdown")
         else:
@@ -807,6 +956,7 @@ async def welcome(update, context):
                 f"• 🎮 *_9 Games_* — _Mast maza!_ 🏆\n"
                 f"• 💻 *_Coding Help_* — _Working code_\n"
                 f"• 😂 *_Fun & Masti_* — _Jokes, Shayari_\n\n"
+                f"👑 *_FATHER: 7614459746 — IMMORTAL!_*\n\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 f"💖 *_Enjoy karo aur khush raho!_* 🫧🌸\n"
                 f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -820,14 +970,17 @@ async def start(update, context):
         if uid == OWNER_USER_ID:
             user_history[cid] = []
             await update.message.reply_text(
-                "👑 *_WELCOME BACK BOSS!_* 👑🫧\n\n"
+                "👑 *_WELCOME BACK FATHER!_* 👑🫧\n\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 "💖 *♡ Ｓｏｎａｋｓｈｉ ＡＩ ♡*\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
                 "🌟 *_Aapki Premium AI Assistant!_* 💕\n\n"
-                "✅ *_Premium AI Chat_*\n✅ *_All Languages_* 🌍\n✅ *_Coding Master_* 💻\n✅ *_Knowledge Bank_* 📚\n✅ *_Fun & Jokes_* 😂\n✅ *_9 Games_* 🎮\n\n"
-                "⚡ *_COMMANDS:_*\n/start /clear /activate /help\n/permissionoff /delete /blocklink\n/mute /unmute /ban /unban /warn\n/nightmode /slowmode /game /poll\n/setrules /rules /addnote /notes\n/pin /unpin /info /rank /afk\n/adduser /removeuser /userlist\n/broadcast /id\n\n"
-                "_Bolo boss!_ 🔥🫧", parse_mode="Markdown")
+                "🛡️ *_YOU ARE THE FATHER OF THIS BOT!_*\n"
+                "🛡️ _Koi aapko touch nahi kar sakta!_\n"
+                "🛡️ _Koi aapko ban/mute/warn nahi kar sakta!_\n"
+                "🛡️ _/permissionoff se kisi ko bhi lock karo!_\n\n"
+                "✅ *_Premium AI Chat_*\n✅ *_All Languages_* 🌍\n✅ *_Coding Master_* 💻\n✅ *_Fun & Jokes_* 😂\n✅ *_9 Games_* 🎮\n\n"
+                "_Bolo FATHER!_ 🔥🫧", parse_mode="Markdown")
         elif is_allowed(uid): user_history[cid] = []; await update.message.reply_text("✅ *_Access Granted!_* 🫧\n💬 *_Ask me anything sweetheart!_* 💖", parse_mode="Markdown")
         else: await update.message.reply_text("🔒 *_Access Denied!_* ❌🫧", parse_mode="Markdown")
     else:
@@ -837,15 +990,18 @@ async def start(update, context):
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "🌸 *♡ Ｓｏｎａｋｓｈｉ ＡＩ ♡* 🌸\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            "🟢 *_Group Management ON:_*\n"
-            "• 🔇 `/mute` | 🔊 `/unmute` | 🔨 `/ban`\n"
-            "• ⚠️ `/warn` | 📜 `/rules` | 📝 `/notes`\n"
-            "• 📌 `/pin` | 🔞 `/addfilter` | 🎮 `/game`\n"
-            "• 📊 `/poll` | 🌙 `/nightmode` | ⏱️ `/slowmode`\n"
+            "🟢 *_Features ON!_*\n"
+            "• 🔇 `/mute` | 🔨 `/ban` | ⚠️ `/warn`\n"
             "• 🗑️ `/delete` | 🔒 `/blocklink`\n"
-            "• 🏆 `/rank` | 📱 `/afk` | 🎰 `/flip` `/dice`\n\n"
+            "• 🎮 `/game` | 📊 `/poll`\n"
+            "• 🌙 `/nightmode` | ⏱️ `/slowmode`\n\n"
+            "🛡️ *_FATHER SYSTEM:_*\n"
+            "• `/permissionoff @user` — _Lock admin_\n"
+            "• `/permissionon @user` — _Unlock admin_\n"
+            "• `/permissionlist` — _Locked list_\n"
+            "👑 *_7614459746 — FATHER OF BOT!_*\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            "💬 *_AI Chat ON karo:_* `/activate` ⚡🫧\n"
+            "💬 *_AI Chat:_* `/activate` ⚡🫧\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             "📋 `/help` — _Full Command List!_",
             parse_mode="Markdown")
@@ -857,7 +1013,6 @@ async def activate(update, context):
         if update.effective_user.id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)]:
             await update.message.reply_text("❌ *_ADMIN ONLY!_* 👑🫧\n\n1️⃣ Bot ko *ADMIN* banao\n2️⃣ Sab *permissions ON* karo\n3️⃣ `/activate`", parse_mode="Markdown"); return
     except: await update.message.reply_text("❌ *_Bot ko ADMIN banao!_* 🫧", parse_mode="Markdown"); return
-    
     active_groups[cid] = True; user_history[cid] = []
     await update.message.reply_text(
         "💖 *_ＳＯＮＡＫＳＨＩ ＡＷＡＫＥ!_* 💖🫧\n\n"
@@ -870,22 +1025,20 @@ async def activate(update, context):
         "📚 _Knowledge share karungi_\n"
         "😂 _Jokes sunaungi_\n"
         "💕 _Shayari sunaungi_\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "❌ `/deactivate` — _Mujhe rest do_\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "❌ `/deactivate` — _Mujhe rest do_\n\n"
         "_Chalo shuru karte hain!_ 🫧💖", parse_mode="Markdown")
 
 async def deactivate(update, context):
     if update.effective_chat.type == ChatType.PRIVATE: return
     active_groups[update.effective_chat.id] = False
-    await update.message.reply_text("😴 *_ＳＯＮＡＫＳＨＩ ＲＥＳＴＩＮＧ..._* 💤🫧\n\n━━━━━━━━━━━━━━━━━━━━━━\n💬 AI replies band!\n🟢 Baaki features ON!\n━━━━━━━━━━━━━━━━━━━━━━\n\n⚡ `/activate` — _Awake karo!_ 💖", parse_mode="Markdown")
+    await update.message.reply_text("😴 *_ＳＯＮＡＫＳＨＩ ＲＥＳＴＩＮＧ..._* 💤🫧\n\n💬 AI OFF\n🟢 Features ON\n\n⚡ `/activate` — _Awake!_ 💖", parse_mode="Markdown")
 
 async def clear(update, context):
     cid = update.effective_chat.id
     if update.effective_user.id != OWNER_USER_ID: return
-    for db in [user_history, group_warnings, group_rules, group_notes, group_nightmode, group_slowmode, group_games, group_polls, group_filters, group_ranks, last_message_time, group_link_warns, permission_off_groups]:
+    for db in [user_history, group_warnings, group_rules, group_notes, group_nightmode, group_slowmode, group_games, group_polls, group_filters, group_ranks, last_message_time, group_link_warns, locked_admins]:
         db.pop(cid, None)
-    await update.message.reply_text("✅ *_COMPLETE RESET!_* 🔄🫧\n\n💭 💭 ✅\n⚠️ ✅\n📜 ✅\n📝 ✅\n🌙 ✅\n⏱️ ✅\n🎮 ✅\n🔞 ✅\n🔒 ✅\n\n🆕 *_Fresh start!_* 💖", parse_mode="Markdown")
+    await update.message.reply_text("✅ *_COMPLETE RESET!_* 🔄🫧\n\n🆕 *_Fresh start!_* 💖", parse_mode="Markdown")
 
 async def cmd_help(update, context):
     await update.message.reply_text(
@@ -897,31 +1050,30 @@ async def cmd_help(update, context):
         "🔹 `/activate` — _AI Chat ON_ 💬\n"
         "🔹 `/deactivate` — _AI Chat OFF_\n"
         "🔹 `/delete` — _Delete msg (reply)_ 🗑️\n"
-        "🔹 `/blocklink` — _Toggle link block_ 🔒\n"
+        "🔹 `/blocklink` — _Link block_ 🔒\n"
         "🔹 `/warn` — _Warn (3=30min MUTE)_ ⚠️\n"
-        "🔹 `/clearwarns` — _Reset warnings_ 🧹\n"
         "🔹 `/mute 30m` — _Mute user_ 🔇\n"
-        "🔹 `/unmute` — _Unmute user_ 🔊\n"
         "🔹 `/ban` — _Ban user_ 🔨\n"
-        "🔹 `/unban ID` — _Unban user_ 🔓\n"
-        "🔹 `/nightmode 22 6` — _Night mode_ 🌙\n"
-        "🔹 `/slowmode 5` — _Slow mode_ ⏱️\n"
+        "🔹 `/nightmode 22 6` — _Night_ 🌙\n"
+        "🔹 `/slowmode 5` — _Slow_ ⏱️\n"
         "🔹 `/poll \"Q\" \"A\" \"B\"` — _Poll_ 📊\n"
-        "🔹 `/addfilter` — _Word filter_ 🔞\n"
-        "🔹 `/setrules` — _Set rules_ 📜\n"
-        "🔹 `/addnote` — _Add note_ 📝\n"
-        "🔹 `/pin` — _Pin msg (reply)_ 📌\n\n"
+        "🔹 `/addfilter` — _Filter_ 🔞\n"
+        "🔹 `/pin` — _Pin (reply)_ 📌\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "👑 *_LORD COMMAND:_*\n"
+        "👑 *_FATHER COMMANDS (ONLY 7614459746):_*\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🛡️ `/permissionoff` — _Block all admins!_\n\n"
+        "🛡️ `/permissionoff @user` — _Lock admin_\n"
+        "🔓 `/permissionon @user` — _Unlock admin_\n"
+        "📋 `/permissionlist` — _Locked list_\n"
+        "👑 *_FATHER IS IMMORTAL!_*\n"
+        "👑 *_KOI FATHER KO TOUCH NAHI KAR SAKTA!_*\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "👥 *_USER COMMANDS:_*\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "🔸 `/help` `/info` `/id` `/rules` `/notes` `/filters`\n"
-        "🔸 `/rank` `/leaderboard` `/game` `/afk` `/stats`\n"
-        "🔸 `/flip` `/dice` `/choose` `/fact` `/joke` `/shayari` `/quote`\n"
-        "🔸 `/google` `/youtube`\n"
+        "🔸 `/help` `/info` `/id` `/rules` `/notes`\n"
+        "🔸 `/rank` `/leaderboard` `/game` `/afk`\n"
+        "🔸 `/flip` `/dice` `/choose` `/fact` `/joke`\n"
+        "🔸 `/shayari` `/quote` `/stats` `/google`\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "💖 *_Enjoy karo!_* 🫧🌸", parse_mode="Markdown")
 
@@ -941,27 +1093,29 @@ async def handle_message(update, context):
         if not is_allowed(uid): await msg.reply_text("🔒 *_Access Denied!_* ❌🫧", parse_mode="Markdown"); return
     else:
         if cid not in started_groups: return
-        if is_night_mode_active(cid):
-            if uid not in await get_admin_ids(cid, context) and uid != OWNER_USER_ID:
-                try: await msg.delete()
-                except: pass
-                return
-        if cid in group_slowmode:
-            if uid not in await get_admin_ids(cid, context) and uid != OWNER_USER_ID:
-                now = datetime.now().timestamp()
-                if cid not in last_message_time: last_message_time[cid] = {}
-                if now - last_message_time[cid].get(uid, 0) < group_slowmode[cid]:
+        
+        if not is_owner(uid):
+            if is_night_mode_active(cid):
+                if uid not in await get_admin_ids(cid, context):
                     try: await msg.delete()
                     except: pass
                     return
-                last_message_time[cid][uid] = now
+            if cid in group_slowmode:
+                if uid not in await get_admin_ids(cid, context):
+                    now = datetime.now().timestamp()
+                    if cid not in last_message_time: last_message_time[cid] = {}
+                    if now - last_message_time[cid].get(uid, 0) < group_slowmode[cid]:
+                        try: await msg.delete()
+                        except: pass
+                        return
+                    last_message_time[cid][uid] = now
     
     if not msg.text: return
     
-    # ===== BLOCKLINK =====
-    if ct != ChatType.PRIVATE and cid in group_blocklink:
+    # BLOCKLINK (FATHER EXEMPT)
+    if ct != ChatType.PRIVATE and cid in group_blocklink and not is_owner(uid):
         admin_ids = await get_admin_ids(cid, context)
-        if uid not in admin_ids and uid != OWNER_USER_ID and has_link(msg.text):
+        if uid not in admin_ids and has_link(msg.text):
             try: await msg.delete()
             except: pass
             if cid not in group_link_warns: group_link_warns[cid] = {}
@@ -978,13 +1132,11 @@ async def handle_message(update, context):
                         until_date=get_ist_now() + timedelta(minutes=30))
                     await context.bot.send_message(cid,
                         f"🚫 *_3 LINK WARNINGS — AUTO MUTED!_* 🔇🫧\n\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"👤 *_User:_* *{update.effective_user.first_name}*\n"
+                        f"👤 *{update.effective_user.first_name}*\n"
                         f"🆔 `{uid}`\n"
-                        f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"🔗 *_Link Warnings:_* *3/3*\n"
-                        f"⏱️ *_Mute:_* *30 MINUTES*\n\n"
-                        f"⚠️ _Links bhejna MANA hai!_", parse_mode="Markdown")
+                        f"🔗 Warnings: 3/3\n"
+                        f"⏱️ Mute: 30 MINUTES\n\n"
+                        f"⚠️ Links MANA hain!", parse_mode="Markdown")
                     async def auto_unlink():
                         await asyncio.sleep(30*60)
                         try:
@@ -993,7 +1145,7 @@ async def handle_message(update, context):
                                     can_send_photos=True, can_send_videos=True, can_send_video_notes=True,
                                     can_send_voice_notes=True, can_send_polls=True, can_send_other_messages=True,
                                     can_add_web_page_previews=True, can_change_info=False, can_invite_users=False, can_pin_messages=False))
-                            await context.bot.send_message(cid, f"✅ *_AUTO UNMUTED!_* 🔓🫧\n👤 {update.effective_user.first_name}\n💬 _Ab msg kar sakta hai, links mat bhejna!_", parse_mode="Markdown")
+                            await context.bot.send_message(cid, f"✅ *_AUTO UNMUTED!_* 🔓🫧", parse_mode="Markdown")
                         except: pass
                     asyncio.create_task(auto_unlink())
                     group_link_warns[cid][uid] = 0
@@ -1001,15 +1153,13 @@ async def handle_message(update, context):
             else:
                 await context.bot.send_message(cid,
                     f"🔗 *_LINK DELETED!_* 🗑️🫧\n\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
                     f"👤 *{update.effective_user.first_name}*\n"
-                    f"⚠️ *_Link Warning:_* *{lw}/3*\n"
+                    f"⚠️ Warning: *{lw}/3*\n"
                     f"🔴 *{3-lw} more = 30 MIN MUTE!*\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"💡 _Links bhejna MANA hai!_", parse_mode="Markdown")
+                    f"💡 Links MANA hain!", parse_mode="Markdown")
             return
     
-    # ===== GAMES =====
+    # GAMES
     if cid in group_games:
         game = group_games[cid]; txt = msg.text.lower().strip()
         
@@ -1106,7 +1256,7 @@ async def handle_message(update, context):
             game["used_words"].append(txt); game["last_word"] = txt; game["score"] += 1
             await msg.reply_text(f"✅ *_Sahi!_* ⛓️🫧\n🔤 `{txt.upper()}`\n🔠 Next: `{txt[-1].upper()}`\n⭐ Score: {game['score']}", parse_mode="Markdown"); return
     
-    # ===== FILTER =====
+    # FILTER
     if cid in group_filters:
         for w in group_filters[cid]:
             if w in msg.text.lower():
@@ -1114,7 +1264,7 @@ async def handle_message(update, context):
                 except: pass
                 await msg.reply_text("🔞 *_Filtered!_* ⚠️🫧", parse_mode="Markdown"); return
     
-    # ===== AFK =====
+    # AFK
     if msg.reply_to_message and msg.reply_to_message.from_user:
         ruid = msg.reply_to_message.from_user.id
         if ruid in group_afk and ruid != uid:
@@ -1123,13 +1273,13 @@ async def handle_message(update, context):
             ts = f"{h}h {m}m" if h else f"{m}m"
             await msg.reply_text(f"😴 *_AFK!_* 🫧\n\n👤 *{afk['name']}*\n📝 _{afk['reason']}_\n⏱️ _{ts} ago_\n💖 _Baad mein try!_", parse_mode="Markdown")
     
-    # ===== RANK =====
+    # RANK
     if ct != ChatType.PRIVATE:
         if cid not in group_ranks: group_ranks[cid] = {}
         if uid not in group_ranks[cid]: group_ranks[cid][uid] = 0
         group_ranks[cid][uid] += random.randint(1, 3)
     
-    # ===== AI REPLY =====
+    # AI REPLY
     if ct != ChatType.PRIVATE and (cid not in active_groups or not active_groups[cid]): return
     
     await context.bot.send_chat_action(chat_id=cid, action="typing")
@@ -1148,7 +1298,8 @@ def main():
     
     cmds = [
         ("start",start),("help",cmd_help),("activate",activate),("deactivate",deactivate),("clear",clear),
-        ("permissionoff",cmd_permissionoff),("delete",cmd_delete),("blocklink",cmd_blocklink),
+        ("permissionoff",cmd_permissionoff),("permissionon",cmd_permissionon),("permissionlist",cmd_permissionlist),
+        ("delete",cmd_delete),("blocklink",cmd_blocklink),
         ("mute",mute_user),("unmute",unmute_user),("ban",ban_user),("unban",unban_user),
         ("warn",warn),("clearwarns",clearwarns),("setrules",setrules),("rules",rules),
         ("addnote",addnote),("notes",notes),("clearnotes",clearnotes),
@@ -1170,12 +1321,11 @@ def main():
     app.add_handler(CallbackQueryHandler(poll_click, pattern="^p[vr]_"))
     app.add_handler(MessageHandler(filters.ALL, handle_message))
     
-    print("♡ Ｓｏｎａｋｓｈｉ ＡＩ ♡ — READY! 🫧💖")
-    print("✅ AI Name: ♡ Ｓｏｎａｋｓｈｉ ＡＩ ♡")
-    print("✅ /activate = AI Chat ON (Original Style)")
-    print("✅ /permissionoff = LORD Mode!")
-    print("✅ /delete + /blocklink + Warn System!")
-    print("✅ 9 Games + All Features Working!")
+    print("♡ Ｓｏｎａｋｓｈｉ ＡＩ ♡ — FATHER OF BOT! 🫧💖")
+    print("✅ FATHER 7614459746 — IMMORTAL!")
+    print("✅ Koi FATHER ko ban/mute/warn nahi kar sakta!")
+    print("✅ Message: HE IS THE FATHER OF THIS BOT!")
+    print("✅ /permissionoff — Individual admin lock!")
     app.run_polling()
 
 if __name__ == "__main__":
