@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 from telegram import Update, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from telegram.constants import ChatType
-from collections import defaultdict
 
 # ================== KEYS ==================
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -27,30 +26,22 @@ allowed_users = {7614459746}
 group_warnings = {}
 group_rules = {}
 group_notes = {}
-
-# ================== NEW FEATURE DATABASES ==================
-group_polls = {}           # Active polls {chat_id: {poll_id: {question, options, votes}}}
-group_games = {}          # Games {chat_id: {game_type, data}}
-group_reminders = {}      # Reminders {chat_id: [{user_id, time, message}]}
-group_filters = {}        # Word filters {chat_id: [words]}
-group_welcome_msgs = {}   # Custom welcome {chat_id: message}
-group_goodbye_msgs = {}   # Custom goodbye {chat_id: message}
-group_antispam = {}       # Antispam {chat_id: {user_id: [timestamps]}}
-group_ranks = {}          # User ranks {chat_id: {user_id: score}}
-group_nicknames = {}      # Nicknames {chat_id: {user_id: nickname}}
-group_bio = {}            # Group bio {chat_id: text}
-group_media_count = {}    # Media stats {chat_id: {user_id: count}}
-group_voice_stats = {}    # Voice stats {chat_id: {user_id: minutes}}
-group_afk = {}            # AFK users {user_id: {reason, time}}
-group_reactions = {}      # Auto reactions {chat_id: {trigger: reaction}}
-group_stickers = {}       # Sticker packs tracking
-group_slowmode = {}       # Slowmode {chat_id: seconds}
-group_nightmode = {}      # Night mode {chat_id: {start_hour, end_hour}}
-group_locks = {}          # Locked features {chat_id: [features]}
-group_invites = {}        # Invite tracking {chat_id: {user_id: invited_by}}
-group_admins_only = {}    # Admin only mode {chat_id: bool}
-group_topics = {}         # Group topics {chat_id: [topics]}
-group_schedule = {}       # Scheduled messages {chat_id: [{id, time, message}]}
+group_polls = {}
+group_games = {}
+group_reminders = {}
+group_filters = {}
+group_welcome_msgs = {}
+group_goodbye_msgs = {}
+group_antispam = {}
+group_ranks = {}
+group_nicknames = {}
+group_reactions = {}
+group_slowmode = {}
+group_nightmode = {}
+group_locks = {}
+group_schedule = {}
+group_afk = {}
+group_admins_only = {}
 
 # ================== AVANTIKA AI ==================
 AVANTIKA_PREAMBLE = """You are AVANTIKA AI — Premium, Smart, Multi-Language assistant.
@@ -99,9 +90,8 @@ def get_ai_reply(text, chat_id):
         return resp.text
     except: return "😅 _Fir se bol!_ 💎"
 
-# ================== 🎮 NEW GAME SYSTEM ==================
+# ================== 🎮 GAME SYSTEM ==================
 async def start_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """🎮 Game Center"""
     cid = update.effective_chat.id
     keyboard = [
         [InlineKeyboardButton("🎯 Number Guess", callback_data="game_guess"),
@@ -157,20 +147,20 @@ async def game_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== 📊 POLL SYSTEM ==================
 async def create_poll(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """📊 Create interactive poll"""
     cid = update.effective_chat.id
     if update.effective_chat.type == ChatType.PRIVATE: return
     
     args = context.args
     if len(args) < 3:
-        await update.message.reply_text(
+        msg = (
             "📊 *POLL CREATE*\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "`/poll "question" "option1" "option2" ...`\n\n"
+            "`/poll \"question\" \"option1\" \"option2\" ...`\n\n"
             "Example:\n"
-            '`/poll "Best language?" "Python" "JS" "Go"`',
-            parse_mode="Markdown"
-        ); return
+            "`/poll \"Best language?\" \"Python\" \"JS\" \"Go\"`"
+        )
+        await update.message.reply_text(msg, parse_mode="Markdown")
+        return
     
     text = " ".join(args)
     parts = re.findall(r'"([^"]*)"', text)
@@ -189,14 +179,13 @@ async def create_poll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     group_polls[cid][pid] = {"question": question, "options": options, "votes": {i: set() for i in range(len(options))}}
     
-    await update.message.reply_text(
+    msg = (
         f"📊 *POLL #{pid}*\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"*Q:* {question}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
+        f"━━━━━━━━━━━━━━━━━━━━━━"
     )
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def poll_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -210,7 +199,6 @@ async def poll_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if cid in group_polls and pid in group_polls[cid]:
             poll = group_polls[cid][pid]
-            # Remove previous vote
             for v in poll["votes"].values():
                 v.discard(uid)
             poll["votes"][oid].add(uid)
@@ -248,7 +236,7 @@ async def antispam_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_antispam[cid][uid] = [t for t in group_antispam[cid][uid] if (now - t).seconds < 10]
     group_antispam[cid][uid].append(now)
     
-    if len(group_antispam[cid][uid]) > 5:  # 5 messages in 10 seconds
+    if len(group_antispam[cid][uid]) > 5:
         try:
             await context.bot.restrict_chat_member(
                 cid, uid,
@@ -278,7 +266,8 @@ async def check_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if cid not in group_ranks or not group_ranks[cid]:
-        await update.message.reply_text("🏆 _No scores yet!_", parse_mode="Markdown"); return
+        await update.message.reply_text("🏆 _No scores yet!_", parse_mode="Markdown")
+        return
     
     top = sorted(group_ranks[cid].items(), key=lambda x: x[1], reverse=True)[:10]
     lb = "🏆 *LEADERBOARD* 🔥\n\n"
@@ -287,14 +276,17 @@ async def leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user = await context.bot.get_chat(uid)
             name = user.first_name
-        except: name = f"User {uid}"
+        except:
+            name = f"User {uid}"
         lb += f"{medals.get(i, '👤')} *{name}*: {score} XP\n"
     await update.message.reply_text(lb, parse_mode="Markdown")
 
 # ================== 🔞 WORD FILTER ==================
 async def add_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
-    if not context.args: await update.message.reply_text("🔞 `/addfilter word`", parse_mode="Markdown"); return
+    if not context.args:
+        await update.message.reply_text("🔞 `/addfilter word`", parse_mode="Markdown")
+        return
     
     word = " ".join(context.args).lower()
     if cid not in group_filters: group_filters[cid] = []
@@ -315,15 +307,21 @@ async def list_filters(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if cid in group_filters and group_filters[cid]:
         fl = "\n".join([f"• `{w}`" for w in group_filters[cid]])
         await update.message.reply_text(f"🔞 *FILTERS:*\n\n{fl}", parse_mode="Markdown")
-    else: await update.message.reply_text("🔞 _No filters!_", parse_mode="Markdown")
+    else:
+        await update.message.reply_text("🔞 _No filters!_", parse_mode="Markdown")
 
 # ================== ⏰ REMINDER SYSTEM ==================
 async def set_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cid = update.effective_chat.id; uid = update.effective_user.id
-    if len(context.args) < 2: await update.message.reply_text("⏰ `/remind 10m message`", parse_mode="Markdown"); return
+    cid = update.effective_chat.id
+    uid = update.effective_user.id
+    if len(context.args) < 2:
+        await update.message.reply_text("⏰ `/remind 10m message`", parse_mode="Markdown")
+        return
     
     ts = parse_time(context.args[0])
-    if not ts: await update.message.reply_text("❌ Invalid time!", parse_mode="Markdown"); return
+    if not ts:
+        await update.message.reply_text("❌ Invalid time!", parse_mode="Markdown")
+        return
     
     msg = " ".join(context.args[1:])
     rt = get_ist_now() + timedelta(minutes=ts)
@@ -372,14 +370,10 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "🔥 _Activate karo — DHAMAKA!_",
                 parse_mode="Markdown")
         else:
-            msg = group_welcome_msgs.get(cid, 
+            msg = group_welcome_msgs.get(cid,
                 f"✨ *WELCOME!* ✨\n\n👤 *{user.first_name}*\n🆔 `{user.id}`\n\n🌟 _Aapka swagat hai! 🎉_")
             msg = msg.replace("{name}", user.first_name).replace("{id}", str(user.id)).replace("{mention}", f"[{user.first_name}](tg://user?id={user.id})")
             await context.bot.send_message(cid, msg, parse_mode="Markdown")
-            
-            # Track invites
-            if cid not in group_invites: group_invites[cid] = {}
-            # Can't track who invited in Telegram Bot API, so skip
 
 # ================== 👋 GOODBYE ==================
 async def goodbye(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -397,13 +391,15 @@ async def goodbye(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def set_slowmode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if not context.args:
-        await update.message.reply_text("⏱️ `/slowmode 5` (seconds)\n`/slowmode off`", parse_mode="Markdown"); return
+        await update.message.reply_text("⏱️ `/slowmode 5` (seconds)\n`/slowmodeoff`", parse_mode="Markdown")
+        return
     
     try:
         sec = int(context.args[0])
         group_slowmode[cid] = sec
         await update.message.reply_text(f"⏱️ *SLOWMODE: {sec}s* 🐌", parse_mode="Markdown")
-    except: pass
+    except:
+        pass
 
 async def slowmode_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
@@ -414,13 +410,15 @@ async def slowmode_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def set_nightmode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if len(context.args) < 2:
-        await update.message.reply_text("🌙 `/nightmode 22 6` (10PM-6AM)", parse_mode="Markdown"); return
+        await update.message.reply_text("🌙 `/nightmode 22 6` (10PM-6AM)", parse_mode="Markdown")
+        return
     
     try:
         start, end = int(context.args[0]), int(context.args[1])
         group_nightmode[cid] = {"start": start, "end": end}
         await update.message.reply_text(f"🌙 *NIGHT MODE* 😴\n🕙 {start}:00 - {end}:00", parse_mode="Markdown")
-    except: pass
+    except:
+        pass
 
 # ================== 🔒 LOCK/UNLOCK FEATURES ==================
 async def lock_feature(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -442,7 +440,8 @@ async def unlock_feature(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== 🏷️ NICKNAMES ==================
 async def set_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cid = update.effective_chat.id; uid = update.effective_user.id
+    cid = update.effective_chat.id
+    uid = update.effective_user.id
     if not context.args: return
     
     if cid not in group_nicknames: group_nicknames[cid] = {}
@@ -470,31 +469,34 @@ async def group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat = await context.bot.get_chat(cid)
         admins = await context.bot.get_chat_administrators(cid)
         
-        stats = f"📊 *GROUP STATS* 🔥\n\n"
-        stats += f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        stats += f"👥 *Name:* {chat.title}\n"
-        stats += f"🆔 *ID:* `{cid}`\n"
-        stats += f"👑 *Admins:* {len(admins)}\n"
-        stats += f"📝 *Notes:* {len(group_notes.get(cid, []))}\n"
-        stats += f"🔞 *Filters:* {len(group_filters.get(cid, []))}\n"
-        stats += f"⚠️ *Warns:* {sum(group_warnings.get(cid, {}).values())}\n"
-        stats += f"🏆 *Ranked Users:* {len(group_ranks.get(cid, {}))}\n"
-        stats += f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        stats += f"🔒 *Locks:* {', '.join(group_locks.get(cid, ['None']))}\n"
-        stats += f"⏱️ *Slowmode:* {group_slowmode.get(cid, 'OFF')}s\n"
-        stats += f"🌙 *Nightmode:* {'ON' if cid in group_nightmode else 'OFF'}\n"
-        stats += f"🛡️ *Antispam:* ACTIVE\n"
-        stats += f"━━━━━━━━━━━━━━━━━━━━━━"
-        
+        stats = (
+            f"📊 *GROUP STATS* 🔥\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👥 *Name:* {chat.title}\n"
+            f"🆔 *ID:* `{cid}`\n"
+            f"👑 *Admins:* {len(admins)}\n"
+            f"📝 *Notes:* {len(group_notes.get(cid, []))}\n"
+            f"🔞 *Filters:* {len(group_filters.get(cid, []))}\n"
+            f"⚠️ *Warns:* {sum(group_warnings.get(cid, {}).values())}\n"
+            f"🏆 *Ranked Users:* {len(group_ranks.get(cid, {}))}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔒 *Locks:* {', '.join(group_locks.get(cid, ['None']))}\n"
+            f"⏱️ *Slowmode:* {group_slowmode.get(cid, 'OFF')}s\n"
+            f"🌙 *Nightmode:* {'ON' if cid in group_nightmode else 'OFF'}\n"
+            f"🛡️ *Antispam:* ACTIVE\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━"
+        )
         await update.message.reply_text(stats, parse_mode="Markdown")
-    except: pass
+    except:
+        pass
 
 # ================== ⚡ REACTION SYSTEM ==================
 async def add_reaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if len(context.args) < 2: return
     
-    trigger, reaction = context.args[0].lower(), " ".join(context.args[1:])
+    trigger = context.args[0].lower()
+    reaction = " ".join(context.args[1:])
     if cid not in group_reactions: group_reactions[cid] = {}
     group_reactions[cid][trigger] = reaction
     await update.message.reply_text(f"⚡ *Reaction added!*\n`{trigger}` → {reaction}", parse_mode="Markdown")
@@ -554,7 +556,7 @@ async def joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
     jokes = [
         "😂 Teacher: 'Tum late kyun?' Student: 'Ghar se nikalte time corner tha!'",
         "🤣 Santa: 'Maine online pizza order kiya... ab tak download nahi hua!'",
-        "😆 Banta: 'Mujhe English aati hai!' Santa: 'Toh 'naach' ko English mein kya bolenge?' Banta: 'Dance!' Santa: 'Aur 'gana'?' Banta: 'Gance!'",
+        "😆 Banta: 'Mujhe English aati hai!' Santa: 'Toh naach ko English mein kya bolenge?' Banta: 'Dance!' Santa: 'Aur gana?' Banta: 'Gance!'",
     ]
     await update.message.reply_text(random.choice(jokes), parse_mode="Markdown")
 
@@ -588,19 +590,28 @@ async def youtube_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== ORIGINAL COMMANDS ==================
 async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!* 👑", parse_mode="Markdown"); return
+    if update.effective_user.id != OWNER_USER_ID:
+        await update.message.reply_text("❌ *Sirf BOSS!* 👑", parse_mode="Markdown")
+        return
     if not context.args: return
-    try: allowed_users.add(int(context.args[0])); await update.message.reply_text(f"✅ *Added!* 🆔 `{context.args[0]}`", parse_mode="Markdown")
-    except: pass
+    try:
+        allowed_users.add(int(context.args[0]))
+        await update.message.reply_text(f"✅ *Added!* 🆔 `{context.args[0]}`", parse_mode="Markdown")
+    except:
+        pass
 
 async def removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_USER_ID: await update.message.reply_text("❌ *Sirf BOSS!*", parse_mode="Markdown"); return
+    if update.effective_user.id != OWNER_USER_ID:
+        await update.message.reply_text("❌ *Sirf BOSS!*", parse_mode="Markdown")
+        return
     if not context.args: return
     try:
         rid = int(context.args[0])
         if rid == OWNER_USER_ID: return
-        allowed_users.discard(rid); await update.message.reply_text(f"✅ *Removed!* 🆔 `{rid}`", parse_mode="Markdown")
-    except: pass
+        allowed_users.discard(rid)
+        await update.message.reply_text(f"✅ *Removed!* 🆔 `{rid}`", parse_mode="Markdown")
+    except:
+        pass
 
 async def userlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_USER_ID: return
@@ -612,12 +623,16 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args: return
     msg = "📢 *BOSS* 👑\n\n" + " ".join(context.args)
     for uid in allowed_users:
-        try: await context.bot.send_message(uid, msg, parse_mode="Markdown")
-        except: pass
+        try:
+            await context.bot.send_message(uid, msg, parse_mode="Markdown")
+        except:
+            pass
 
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.reply_to_message: await update.message.reply_text(f"🆔 `{update.message.reply_to_message.from_user.id}`", parse_mode="Markdown")
-    else: await update.message.reply_text(f"🆔 `{update.effective_user.id}`", parse_mode="Markdown")
+    if update.message.reply_to_message:
+        await update.message.reply_text(f"🆔 `{update.message.reply_to_message.from_user.id}`", parse_mode="Markdown")
+    else:
+        await update.message.reply_text(f"🆔 `{update.effective_user.id}`", parse_mode="Markdown")
 
 async def addnote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
@@ -628,22 +643,29 @@ async def addnote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
-    if cid in group_notes and group_notes[cid]: await update.message.reply_text("📝 *Notes:*\n\n" + "\n".join([f"• {n}" for n in group_notes[cid]]), parse_mode="Markdown")
-    else: await update.message.reply_text("📝 _No notes!_ */addnote*", parse_mode="Markdown")
+    if cid in group_notes and group_notes[cid]:
+        await update.message.reply_text("📝 *Notes:*\n\n" + "\n".join([f"• {n}" for n in group_notes[cid]]), parse_mode="Markdown")
+    else:
+        await update.message.reply_text("📝 _No notes!_ */addnote*", parse_mode="Markdown")
 
-async def clearnotes(update: Update, context: ContextTypes.DEFAULT_TYPE): 
+async def clearnotes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_notes[update.effective_chat.id] = []
     await update.message.reply_text("✅ *Cleared!*", parse_mode="Markdown")
 
 async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message: return
-    try: await update.message.reply_to_message.pin(); await update.message.reply_text("📌 *Pinned!* ✅", parse_mode="Markdown")
-    except: pass
+    try:
+        await update.message.reply_to_message.pin()
+        await update.message.reply_text("📌 *Pinned!* ✅", parse_mode="Markdown")
+    except:
+        pass
 
 async def unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == ChatType.PRIVATE: return
-    try: await context.bot.unpin_all_chat_messages(update.effective_chat.id)
-    except: pass
+    try:
+        await context.bot.unpin_all_chat_messages(update.effective_chat.id)
+    except:
+        pass
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == ChatType.PRIVATE:
@@ -653,24 +675,31 @@ async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             c = await context.bot.get_chat(update.effective_chat.id)
             await update.message.reply_text(f"👥 *{c.title}*\n🆔 `{update.effective_chat.id}`\n👥 Members", parse_mode="Markdown")
-        except: pass
+        except:
+            pass
 
 async def setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if update.effective_chat.type == ChatType.PRIVATE: return
-    if not context.args: await update.message.reply_text("📝 */setrules rules*"); return
+    if not context.args:
+        await update.message.reply_text("📝 */setrules rules*")
+        return
     group_rules[cid] = " ".join(context.args)
-    await update.message.reply_text(f"📜 *Rules Set!* ✅", parse_mode="Markdown")
+    await update.message.reply_text("📜 *Rules Set!* ✅", parse_mode="Markdown")
 
 async def rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
-    if cid in group_rules: await update.message.reply_text(f"📜 *Group Rules:*\n\n{group_rules[cid]}", parse_mode="Markdown")
-    else: await update.message.reply_text("📜 _No rules!_ */setrules*", parse_mode="Markdown")
+    if cid in group_rules:
+        await update.message.reply_text(f"📜 *Group Rules:*\n\n{group_rules[cid]}", parse_mode="Markdown")
+    else:
+        await update.message.reply_text("📜 _No rules!_ */setrules*", parse_mode="Markdown")
 
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if update.effective_chat.type == ChatType.PRIVATE: return
-    if not update.message.reply_to_message: await update.message.reply_text("⚠️ _Reply to warn!_"); return
+    if not update.message.reply_to_message:
+        await update.message.reply_text("⚠️ _Reply to warn!_")
+        return
     t = update.message.reply_to_message.from_user
     if cid not in group_warnings: group_warnings[cid] = {}
     if t.id not in group_warnings[cid]: group_warnings[cid][t.id] = 0
@@ -682,8 +711,10 @@ async def clearwarns(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if update.message.reply_to_message:
         t = update.message.reply_to_message.from_user
-        if cid in group_warnings and t.id in group_warnings[cid]: group_warnings[cid][t.id] = 0
-    else: group_warnings[cid] = {}
+        if cid in group_warnings and t.id in group_warnings[cid]:
+            group_warnings[cid][t.id] = 0
+    else:
+        group_warnings[cid] = {}
     await update.message.reply_text("✅ *Cleared!*", parse_mode="Markdown")
 
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -691,35 +722,51 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == ChatType.PRIVATE: return
     try:
         if update.effective_user.id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)]:
-            await update.message.reply_text("❌ *Sirf Admin!* 👑", parse_mode="Markdown"); return
-    except: return
+            await update.message.reply_text("❌ *Sirf Admin!* 👑", parse_mode="Markdown")
+            return
+    except:
+        return
     t = None
-    if update.message.reply_to_message: t = update.message.reply_to_message.from_user
+    if update.message.reply_to_message:
+        t = update.message.reply_to_message.from_user
     elif context.args:
-        try: t = (await context.bot.get_chat_member(cid, int(context.args[0]))).user
-        except: pass
-    if not t or t.id == update.effective_user.id or t.is_bot: await update.message.reply_text("❌ _Can't ban!_"); return
+        try:
+            t = (await context.bot.get_chat_member(cid, int(context.args[0]))).user
+        except:
+            pass
+    if not t or t.id == update.effective_user.id or t.is_bot:
+        await update.message.reply_text("❌ _Can't ban!_")
+        return
     try:
         await context.bot.ban_chat_member(cid, t.id)
         await update.message.reply_text(f"🔨 *BANNED!* 👤 {t.first_name} 🚫\n\n🆔 `{t.id}`\n🔓 _/unban {t.id}_", parse_mode="Markdown")
-    except: await update.message.reply_text("❌ _Ban failed! Permissions do._", parse_mode="Markdown")
+    except:
+        await update.message.reply_text("❌ _Ban failed! Permissions do._", parse_mode="Markdown")
 
 async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
-    if not context.args: await update.message.reply_text("📝 */unban user_id*"); return
+    if not context.args:
+        await update.message.reply_text("📝 */unban user_id*")
+        return
     try:
         await context.bot.unban_chat_member(cid, int(context.args[0]))
         await update.message.reply_text(f"✅ *UNBANNED!* 🔓\n🆔 `{context.args[0]}`", parse_mode="Markdown")
-    except: await update.message.reply_text("❌ _Unban failed!_", parse_mode="Markdown")
+    except:
+        await update.message.reply_text("❌ _Unban failed!_", parse_mode="Markdown")
 
 async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
-    if update.effective_chat.type == ChatType.PRIVATE: await update.message.reply_text("⚡ *Sirf Group!*", parse_mode="Markdown"); return
+    if update.effective_chat.type == ChatType.PRIVATE:
+        await update.message.reply_text("⚡ *Sirf Group!*", parse_mode="Markdown")
+        return
     
     try:
         if update.effective_user.id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)]:
-            await update.message.reply_text("❌ *Sirf Admin!* 👑", parse_mode="Markdown"); return
-    except: await update.message.reply_text("❌ *Bot ko Admin banao!*", parse_mode="Markdown"); return
+            await update.message.reply_text("❌ *Sirf Admin!* 👑", parse_mode="Markdown")
+            return
+    except:
+        await update.message.reply_text("❌ *Bot ko Admin banao!*", parse_mode="Markdown")
+        return
     
     t, ts = None, "1h"
     if update.message.reply_to_message:
@@ -729,9 +776,10 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             t = (await context.bot.get_chat_member(cid, int(context.args[0]))).user
             ts = " ".join(context.args[1:])
-        except: return
+        except:
+            return
     else:
-        await update.message.reply_text(
+        msg = (
             "🔇 *MUTE SYSTEM* 🇮🇳\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "📌 *Reply karke:*\n"
@@ -739,9 +787,10 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "`/mute 2 hour` | `/mute 1 day`\n\n"
             "📌 *Short:* `25s` `5m` `2h` `1d` `30d`\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "🇮🇳 *IST Timezone* | ⏰ *Auto Unmute ON*",
-            parse_mode="Markdown"
-        ); return
+            "🇮🇳 *IST Timezone* | ⏰ *Auto Unmute ON*"
+        )
+        await update.message.reply_text(msg, parse_mode="Markdown")
+        return
     
     if not t or t.id == update.effective_user.id or t.is_bot: return
     
@@ -809,7 +858,8 @@ async def mute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"💬 _Ab message kar sakta hai!_ 🎉",
                     parse_mode="Markdown"
                 )
-            except: pass
+            except:
+                pass
         asyncio.create_task(auto())
         
     except Exception as e:
@@ -828,9 +878,13 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     t = update.message.reply_to_message.from_user if update.message.reply_to_message else None
     if not t and context.args:
-        try: t = (await context.bot.get_chat_member(cid, int(context.args[0]))).user
-        except: return
-    if not t: await update.message.reply_text("🔊 _Reply /unmute_", parse_mode="Markdown"); return
+        try:
+            t = (await context.bot.get_chat_member(cid, int(context.args[0]))).user
+        except:
+            return
+    if not t:
+        await update.message.reply_text("🔊 _Reply /unmute_", parse_mode="Markdown")
+        return
     
     try:
         await context.bot.restrict_chat_member(
@@ -853,10 +907,13 @@ async def unmute_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💬 _Ab message kar sakta hai!_ 🎉",
             parse_mode="Markdown"
         )
-    except: pass
+    except:
+        pass
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cid = update.effective_chat.id; ct = update.effective_chat.type; uid = update.effective_user.id
+    cid = update.effective_chat.id
+    ct = update.effective_chat.type
+    uid = update.effective_user.id
     if ct == ChatType.PRIVATE:
         if uid == OWNER_USER_ID:
             user_history[cid] = []
@@ -876,8 +933,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "_Bolo boss! 🔥_",
                 parse_mode="Markdown"
             )
-        elif is_allowed(uid): user_history[cid] = []; await update.message.reply_text("✅ *Access Granted!*\n💬 _Ask anything!_", parse_mode="Markdown")
-        else: await update.message.reply_text("🔒 *Access Denied!*", parse_mode="Markdown")
+        elif is_allowed(uid):
+            user_history[cid] = []
+            await update.message.reply_text("✅ *Access Granted!*\n💬 _Ask anything!_", parse_mode="Markdown")
+        else:
+            await update.message.reply_text("🔒 *Access Denied!*", parse_mode="Markdown")
     else:
         user_history[cid] = []
         await update.message.reply_text(
@@ -901,10 +961,17 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == ChatType.PRIVATE: return
     try:
         if update.effective_user.id not in [a.user.id for a in await context.bot.get_chat_administrators(cid)]:
-            await update.message.reply_text("❌ *ADMIN ONLY!* 👑\n\n1️⃣ Bot ko *ADMIN* banao\n2️⃣ Sab *permissions ON* karo\n3️⃣ `/activate`", parse_mode="Markdown"); return
-    except: await update.message.reply_text("❌ *Bot ko ADMIN banao!*", parse_mode="Markdown"); return
+            await update.message.reply_text(
+                "❌ *ADMIN ONLY!* 👑\n\n1️⃣ Bot ko *ADMIN* banao\n2️⃣ Sab *permissions ON* karo\n3️⃣ `/activate`",
+                parse_mode="Markdown"
+            )
+            return
+    except:
+        await update.message.reply_text("❌ *Bot ko ADMIN banao!*", parse_mode="Markdown")
+        return
     
-    active_groups[cid] = True; user_history[cid] = []
+    active_groups[cid] = True
+    user_history[cid] = []
     await update.message.reply_text(
         "✅ *ACTIVATED! SUPERCHARGED!* 🔥\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -929,10 +996,16 @@ async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if update.effective_user.id != OWNER_USER_ID: return
     user_history[cid] = []
-    for db in [group_warnings, group_rules, group_notes, group_polls, group_games, 
+    for db in [group_warnings, group_rules, group_notes, group_polls, group_games,
                group_reminders, group_filters, group_reactions, group_schedule]:
         db.pop(cid, None)
-    await update.message.reply_text("✅ *COMPLETE RESET!* 🔄\n\n💭 Memory ✅\n⚠️ Warnings ✅\n📜 Rules ✅\n📝 Notes ✅\n🎮 Games ✅\n📊 Polls ✅\n🔞 Filters ✅\n📅 Schedule ✅\n\n🆕 _Fresh start!_ 💎", parse_mode="Markdown")
+    await update.message.reply_text(
+        "✅ *COMPLETE RESET!* 🔄\n\n"
+        "💭 Memory ✅\n⚠️ Warnings ✅\n📜 Rules ✅\n📝 Notes ✅\n"
+        "🎮 Games ✅\n📊 Polls ✅\n🔞 Filters ✅\n📅 Schedule ✅\n\n"
+        "🆕 _Fresh start!_ 💎",
+        parse_mode="Markdown"
+    )
 
 # ================== HELP COMMAND ==================
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -963,8 +1036,10 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== MESSAGE HANDLER ==================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cid = update.effective_chat.id; ct = update.effective_chat.type
-    msg = update.message; uid = update.effective_user.id
+    cid = update.effective_chat.id
+    ct = update.effective_chat.type
+    msg = update.message
+    uid = update.effective_user.id
     
     # Welcome/Goodbye
     if msg.new_chat_members:
@@ -983,7 +1058,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not msg.text: return
     
-    # ========== GAME HANDLING ==========
+    # Game handling
     if cid in group_games:
         game = group_games[cid]
         txt = msg.text.lower().strip()
@@ -996,19 +1071,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await msg.reply_text(f"🎯 *CORRECT!* 🎉\nNumber was {game['number']}\nAttempts: {game['attempts']}", parse_mode="Markdown")
                     group_games.pop(cid)
                     return
-                elif guess < game["number"]: await msg.reply_text("📈 *Higher!* ⬆️", parse_mode="Markdown")
-                else: await msg.reply_text("📉 *Lower!* ⬇️", parse_mode="Markdown")
-            except: pass
+                elif guess < game["number"]:
+                    await msg.reply_text("📈 *Higher!* ⬆️", parse_mode="Markdown")
+                else:
+                    await msg.reply_text("📉 *Lower!* ⬇️", parse_mode="Markdown")
+            except:
+                pass
         
         elif game["type"] == "rps":
             if txt in ["rock", "paper", "scissors"]:
                 bot_choice = random.choice(["rock", "paper", "scissors"])
-                if txt == bot_choice: result = "🤝 *TIE!*"
+                if txt == bot_choice:
+                    result = "🤝 *TIE!*"
                 elif (txt == "rock" and bot_choice == "scissors") or \
                      (txt == "paper" and bot_choice == "rock") or \
                      (txt == "scissors" and bot_choice == "paper"):
                     result = "🎉 *YOU WIN!*"
-                else: result = "😢 *BOT WINS!*"
+                else:
+                    result = "😢 *BOT WINS!*"
                 await msg.reply_text(f"✊ *RPS!*\n\nYou: {txt}\nBot: {bot_choice}\n\n{result}", parse_mode="Markdown")
                 group_games.pop(cid)
                 return
@@ -1025,35 +1105,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 group_games.pop(cid)
                 return
     
-    # ========== FILTER CHECK ==========
+    # Filter check
     if cid in group_filters:
         for word in group_filters[cid]:
             if word in msg.text.lower():
-                try: await msg.delete()
-                except: pass
+                try:
+                    await msg.delete()
+                except:
+                    pass
                 await msg.reply_text(f"🔞 *Filtered word detected!* ⚠️\n👤 {update.effective_user.first_name}", parse_mode="Markdown")
                 return
     
-    # ========== ANTISPAM ==========
+    # Antispam
     if ct != ChatType.PRIVATE:
         await antispam_check(update, context)
     
-    # ========== RANK UPDATE ==========
+    # Rank update
     if ct != ChatType.PRIVATE:
         await update_rank(cid, uid)
     
-    # ========== AFK CHECK ==========
+    # AFK check
     if msg.reply_to_message:
         await check_afk(update, context)
     
-    # ========== AUTO REACTIONS ==========
+    # Auto reactions
     if cid in group_reactions:
         for trigger, reaction in group_reactions[cid].items():
             if trigger in msg.text.lower():
-                try: await msg.reply_text(reaction)
-                except: pass
+                try:
+                    await msg.reply_text(reaction)
+                except:
+                    pass
     
-    # ========== AI REPLY ==========
+    # AI Reply
     await context.bot.send_chat_action(chat_id=cid, action="typing")
     
     try:
@@ -1063,7 +1147,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_history[cid].append({"role":"assistant","content":reply})
         user_history[cid] = user_history[cid][-10:]
         await msg.reply_text(reply, parse_mode="Markdown")
-    except: pass
+    except:
+        pass
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -1080,7 +1165,7 @@ def main():
     ]:
         app.add_handler(CommandHandler(cmd, fn))
     
-    # NEW COMMANDS
+    # New commands
     for cmd, fn in [
         ("game", start_game), ("poll", create_poll), ("rank", check_rank),
         ("leaderboard", leaderboard), ("addfilter", add_filter),
@@ -1105,6 +1190,8 @@ def main():
     
     app.add_handler(MessageHandler(filters.ALL, handle_message))
     
-    print("👑 AVANTIKA AI — SUPERCHARGED WITH 40+ FEATURES!"); app.run_polling()
+    print("👑 AVANTIKA AI — SUPERCHARGED WITH 40+ FEATURES!")
+    app.run_polling()
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main()
